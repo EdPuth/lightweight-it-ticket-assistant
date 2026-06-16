@@ -54,6 +54,9 @@
   - 替换 starter 的 `layout.tsx` metadata 与首页；移除 dark-mode 自动切换（固定白色基调）。
   - 将 `ticket-utils.ts` 的 `*_BADGE_CLASS` 改为 `*_DOT_CLASS`（圆点配色），契合单色设计。
   - `npm run lint` / `npm run build` 通过；浏览器验证统计/筛选/搜索/无结果空状态均可用。未加 npm 依赖。
+  - 微交互打磨：hover 悬浮抬升（cubic-bezier 丝滑缓动）；进场卡片"逐个浮现"（`.rise` fade-up +
+    错开 animation-delay）。入场放外层包裹、hover 放卡片本身分层，避免动画 fill 顶掉 hover；
+    遵循 `prefers-reduced-motion`。
 
 ## Next（下一步）
 - **Phase 3 — Ticket Detail Page**（`/tickets/[id]`）

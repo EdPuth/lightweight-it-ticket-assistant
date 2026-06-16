@@ -38,8 +38,13 @@ export function TicketList({
 
   return (
     <ul className="flex flex-col gap-3">
-      {tickets.map((ticket) => (
-        <li key={ticket.id}>
+      {tickets.map((ticket, index) => (
+        <li
+          key={ticket.id}
+          className="rise"
+          // 逐个浮现：按顺序错开入场，最多累计到第 12 个，避免长列表等待过久。
+          style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
+        >
           <TicketCard ticket={ticket} />
         </li>
       ))}

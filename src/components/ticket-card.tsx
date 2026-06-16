@@ -9,7 +9,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="ticket-card group block rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:border-ink/15 hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/25"
+      className="ticket-card group block rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-ink/15 hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/25"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">

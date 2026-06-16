@@ -65,14 +65,19 @@ export default function DashboardPage() {
       </header>
 
       <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {STATUS_ORDER.map((value) => (
-          <StatCard
+        {STATUS_ORDER.map((value, index) => (
+          <div
             key={value}
-            status={value}
-            count={counts[value]}
-            active={status === value}
-            onSelect={handleSelectStatus}
-          />
+            className="rise"
+            style={{ animationDelay: `${index * 60}ms` }}
+          >
+            <StatCard
+              status={value}
+              count={counts[value]}
+              active={status === value}
+              onSelect={handleSelectStatus}
+            />
+          </div>
         ))}
       </section>
 

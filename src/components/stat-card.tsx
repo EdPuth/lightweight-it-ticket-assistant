@@ -19,10 +19,10 @@ export function StatCard({
       type="button"
       onClick={() => onSelect(status)}
       aria-pressed={active}
-      className={`ticket-card flex flex-col items-start gap-1 rounded-xl border bg-surface px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
+      className={`ticket-card flex h-full w-full flex-col items-start gap-1 rounded-xl border bg-surface px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_10px_24px_rgba(0,0,0,0.07)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
         active
           ? "border-ink/70 ring-1 ring-ink/15"
-          : "border-border hover:border-border"
+          : "border-border"
       }`}
     >
       <span className="flex items-center gap-2 text-xs font-medium text-muted">
