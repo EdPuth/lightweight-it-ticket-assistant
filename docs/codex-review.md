@@ -46,3 +46,41 @@
 2. Add small, readable label/color maps in `ticket-utils.ts`, but keep UI styling decisions simple and centralized.
 3. Run `npm run lint` and `npm run build`.
 4. Update `docs/tasks.md` after Phase 1 with completed work, next actions, and risks.
+
+### Phase 1 — Data Model + Mock Tickets + Utils
+- 状态：✅ Reviewed by Codex on 2026-06-16
+
+#### Summary
+- Phase 1 matches `docs/project-brief.md` and `docs/tasks.md`.
+- The implementation stayed inside the intended scope: only `src/lib/types.ts`, `src/lib/mock-tickets.ts`, `src/lib/ticket-utils.ts`, and task docs were added/updated.
+- The TypeScript model is beginner-friendly and follows the brief's union types. No runtime/data dependency was introduced.
+- Mock data has enough variety for Phase 2 dashboard work: 10 tickets, mixed status/priority/category values, and activity timelines.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Manual source review of:
+  - `src/lib/types.ts`
+  - `src/lib/mock-tickets.ts`
+  - `src/lib/ticket-utils.ts`
+- No new dependency added.
+
+#### Findings
+- **P3 — Some mock timelines skip intermediate status changes.** A few resolved/waiting tickets include copy such as "状态从 in_progress 变更为 resolved/waiting" without an earlier activity showing the move from `open` to `in_progress`. This is not a functional issue, but Phase 3's timeline will read more naturally if the missing status-change activity is added or the copy is made less specific.
+- **P3 — `formatRelativeTime()` should be used carefully in rendered pages.** It defaults to `Date.now()`, which is fine in client components, but can create stale or mismatched text if called during server rendering. Phase 2 is likely a client page because it needs filters/search state, so this is manageable; otherwise prefer `formatDateTime()` for server-rendered rows.
+- **P3 — Phase 2 should decide the page direction before component styling starts.** The data layer is ready, so the next useful owner input is visual/product direction: dense helpdesk dashboard, simple card list, or table-first layout. Capture that direction before Claude starts Phase 2 to avoid redesign churn.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- Keep the label/order/badge mappings centralized in `ticket-utils.ts`.
+- Avoid adding test frameworks for now; lint/build plus manual interaction is enough for this practice MVP.
+- For Phase 2, keep filtering local with `useState` / `useMemo`; do not move filters into URL search params unless the owner explicitly asks, because that adds Next.js 16 `searchParams` complexity earlier than needed.
+
+#### Next Actions For Claude Code
+1. Before implementing Phase 2, ask the owner for dashboard/page design preferences and record the chosen direction briefly in `docs/decisions.md` or `docs/tasks.md`.
+2. Build Phase 2 only: dashboard stats, filters/search, ticket list, empty/no-results state, and starter page replacement.
+3. Use the existing `STATUS_ORDER`, `PRIORITY_ORDER`, labels, and badge class maps instead of duplicating display strings in components.
+4. Keep components small and obvious: `StatusBadge`, `PriorityBadge`, `StatCard`, `TicketFilters`, `TicketCard` or `TicketList`.
+5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.

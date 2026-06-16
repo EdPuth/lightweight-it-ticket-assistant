@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Phase 0 | 初始化 Next.js；创建 README/CLAUDE.md/AGENTS.md/docs/* | `npm run dev` 可运行；docs 存在；范围清晰 | ✅ 完成 |
 | Phase 1 | Ticket 类型、mock 数据、ticket utils | 页面可读 mock data；不滥用 any | ✅ 完成 |
-| Phase 2 | Dashboard 统计、筛选、搜索、列表 | 可按状态/优先级筛选；搜索可用；空状态可用 | ⬜ 待开始 |
+| Phase 2 | Dashboard 统计、筛选、搜索、列表 | 可按状态/优先级筛选；搜索可用；空状态可用 | ✅ 完成 |
 | Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ⬜ 待开始 |
 | Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ⬜ 待开始 |
 | Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ⬜ 待开始 |
@@ -36,18 +36,35 @@
     applyTicketFilters / countByStatus / sortByUpdatedDesc，确定性日期格式化
     formatDateTime / formatRelativeTime，集中的 label 与 badge 颜色映射 + 顺序数组。
   - `npm run lint` 与 `npm run build` 均通过。未引入任何新依赖。
+- **Codex Review — Phase 1**
+  - 已 review `src/lib/types.ts`、`src/lib/mock-tickets.ts`、`src/lib/ticket-utils.ts`。
+  - `npm run lint` 与 `npm run build` 均通过。
+  - `docs/codex-review.md` 已追加 Phase 1 review；未发现高优先级阻塞问题。
+
+- **Phase 2 — Dashboard & Ticket List**
+  - Owner 设计方向：refined minimal / editorial（Typora 风格）—— 暖白底 + 纯白浮起卡片、近乎单色、
+    衬线标题/数字、状态圆点为唯一彩色。记录于 `docs/decisions.md` D6。
+  - 字体：next/font 引入 Fraunces（衬线）/ Hanken Grotesk（正文）/ JetBrains Mono（ID），
+    非 npm 依赖；中文回退 PingFang。
+  - 组件：`status-badge.tsx`、`priority-badge.tsx`、`stat-card.tsx`（可点击=状态筛选）、
+    `ticket-filters.tsx`（搜索 + 优先级 select + 清除）、`ticket-card.tsx`（浮起卡片）、
+    `ticket-list.tsx`（含"无工单"与"无匹配"两种空状态）。颜色统一来自 `ticket-utils.ts` 的 DOT 映射。
+  - `src/app/page.tsx`：`'use client'` + `useState`/`useMemo`，统计、搜索 + 状态 + 优先级筛选、
+    按更新时间排序。无 URL searchParams。
+  - 替换 starter 的 `layout.tsx` metadata 与首页；移除 dark-mode 自动切换（固定白色基调）。
+  - 将 `ticket-utils.ts` 的 `*_BADGE_CLASS` 改为 `*_DOT_CLASS`（圆点配色），契合单色设计。
+  - `npm run lint` / `npm run build` 通过；浏览器验证统计/筛选/搜索/无结果空状态均可用。未加 npm 依赖。
 
 ## Next（下一步）
-- **Phase 2 — Dashboard & Ticket List**
-  - 组件：`ticket-card.tsx`、`ticket-list.tsx`、`ticket-filters.tsx`，
-    以及 StatusBadge / PriorityBadge / StatCard 小组件。
-  - `src/app/page.tsx`：用 `useState`/`useMemo` 接入 mock 数据；顶部统计卡片
-    （countByStatus）、搜索 + 状态/优先级筛选（applyTicketFilters）、工单列表。
-  - 空状态 + 筛选无结果时的 "Clear filters" 按钮。
-  - 顺带替换 starter 的 `layout.tsx` metadata 与首页内容（Codex P3 提示）。
-- **Phase 2 Review Focus**
-  - 组件清晰、beginner-friendly；颜色仍只从 `ticket-utils.ts` 引用，不在组件里硬编码。
-  - 空 / 筛选无结果状态可用；保持仅前端、无新依赖。
+- **Phase 3 — Ticket Detail Page**（`/tickets/[id]`）
+  - 注意 Next.js 16：`params` 是 **Promise**，页面需 `await params`。
+  - `ticket-detail.tsx` + 活动时间线组件；复用 StatusBadge / PriorityBadge / formatDateTime /
+    ACTIVITY_TYPE_LABELS / getTicketById。
+  - 操作：Change status、Add internal note（仅更新内存状态）。
+  - 无效 id 的友好"未找到工单"提示。
+  - 顺带处理 Codex Phase 1 P3：补齐部分 mock 工单缺失的 open→in_progress 中间状态变更活动。
+- **Phase 3 Review Focus**
+  - `await params` 用法正确；无效 id 友好处理；timeline 可读；状态更新逻辑清晰。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -55,8 +72,10 @@
 - 范围蔓延风险：避免把 MVP 做成企业级 helpdesk（无登录、无真实 API、无数据库）。
 - README 当前描述的是目标 MVP 功能，不是已完成功能；后续阶段需要逐步更新，或在 Phase 6 明确区分
   planned / implemented。
-- `src/app/layout.tsx` 和 `src/app/page.tsx` 仍是 create-next-app starter 内容；这不阻塞 Phase 1，
-  但进入 Dashboard 阶段时应替换为项目真实 metadata 和首页。
+- ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
+- 少数 mock activity 文案跳过了中间状态变化；不影响 Phase 2，计划在 Phase 3 做 timeline 时补齐。
+- `formatRelativeTime()` 默认使用 `Date.now()`；当前首页是 client component，列表统一用 `formatDateTime()`
+  （确定性 UTC 输出），暂无 hydration 风险。
 
 ## 后续扩展方向（不在 MVP 内）
 - 加入 Supabase / Firebase 存储真实 tickets。

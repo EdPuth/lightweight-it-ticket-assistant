@@ -43,19 +43,20 @@ export const ACTIVITY_TYPE_LABELS: Record<TicketActivityType, string> = {
   reply: '回复',
 };
 
-// badge 颜色：成对的背景 + 文字色，方便直接拼到 className 上。
-export const STATUS_BADGE_CLASS: Record<TicketStatus, string> = {
-  open: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  waiting: 'bg-gray-100 text-gray-600',
-  resolved: 'bg-green-100 text-green-700',
+// 状态 / 优先级的圆点颜色（Tailwind 实心色）。
+// 设计上整体近乎单色，颜色只体现在这个小圆点上，由 Badge 组件统一渲染。
+export const STATUS_DOT_CLASS: Record<TicketStatus, string> = {
+  open: 'bg-blue-500',
+  in_progress: 'bg-amber-500',
+  waiting: 'bg-gray-400',
+  resolved: 'bg-emerald-500',
 };
 
-export const PRIORITY_BADGE_CLASS: Record<TicketPriority, string> = {
-  low: 'bg-gray-100 text-gray-600',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  urgent: 'bg-red-100 text-red-700',
+export const PRIORITY_DOT_CLASS: Record<TicketPriority, string> = {
+  low: 'bg-gray-400',
+  medium: 'bg-blue-500',
+  high: 'bg-orange-500',
+  urgent: 'bg-red-500',
 };
 
 // 稳定的展示 / 筛选顺序（供 Phase 2 的筛选下拉与统计卡片复用）。

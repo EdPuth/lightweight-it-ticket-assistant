@@ -35,3 +35,15 @@
   `docs/prompts/codex-review-prompt.md`。
 - **理由**：两个 agent 不互相自动调用，靠文件 + commit 交接更稳定可控。
 - **影响**：每个阶段一个 commit，作为 Codex review 的清晰边界。
+
+## D6 — UI 设计语言：refined minimal / editorial（Typora 风格）
+- **背景**：Owner 在 Phase 2 前给出设计方向——简洁、白色基调、工单像一张张卡片"浮现"、参考 Typora。
+- **决定**：
+  - 暖白页面底色（`#f7f7f5`）+ 纯白卡片，卡片带发丝边 + 极轻阴影，hover 时微微上浮（浮现感）。
+  - 通篇近乎单色（墨黑 + 暖灰），**唯一彩色是状态/优先级圆点**；主操作按钮用墨黑而非渐变。
+  - 字体：标题/数字用 Fraunces（衬线），正文用 Hanken Grotesk，工单 ID 用 JetBrains Mono；
+    经 next/font 引入（非 npm 依赖），中文回退 PingFang / 系统字体。
+  - 固定白色主题，移除 starter 的 dark-mode 自动切换。
+- **理由**：贴合 Owner 的 Typora 审美；克制单色 + 留白让信息清晰、易 review。
+- **影响**：颜色 token 与字体集中在 `globals.css` 的 `@theme`；圆点配色集中在 `ticket-utils.ts`
+  的 `STATUS_DOT_CLASS` / `PRIORITY_DOT_CLASS`，组件不各自硬编码。后续页面沿用这套语言。
