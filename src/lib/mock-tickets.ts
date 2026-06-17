@@ -159,6 +159,13 @@ export const mockTickets: Ticket[] = [
         createdAt: '2026-06-12T02:00:00.000Z',
       },
       {
+        id: 'ACT-1005-1b',
+        type: 'status_changed',
+        author: 'IT - Emma',
+        content: '状态从 open 变更为 in_progress。',
+        createdAt: '2026-06-12T06:00:00.000Z',
+      },
+      {
         id: 'ACT-1005-2',
         type: 'reply',
         author: 'IT - Emma',
@@ -216,6 +223,13 @@ export const mockTickets: Ticket[] = [
         createdAt: '2026-06-13T05:30:00.000Z',
       },
       {
+        id: 'ACT-1007-1b',
+        type: 'status_changed',
+        author: 'IT - Daniel',
+        content: '状态从 open 变更为 in_progress。',
+        createdAt: '2026-06-13T06:15:00.000Z',
+      },
+      {
         id: 'ACT-1007-2',
         type: 'note',
         author: 'IT - Daniel',
@@ -250,6 +264,13 @@ export const mockTickets: Ticket[] = [
         author: 'Henry Adams',
         content: '工单已创建。',
         createdAt: '2026-06-11T08:00:00.000Z',
+      },
+      {
+        id: 'ACT-1008-1b',
+        type: 'status_changed',
+        author: 'IT - Emma',
+        content: '状态从 open 变更为 in_progress。',
+        createdAt: '2026-06-11T09:30:00.000Z',
       },
       {
         id: 'ACT-1008-2',

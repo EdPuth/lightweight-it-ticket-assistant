@@ -9,7 +9,7 @@
 | Phase 0 | 初始化 Next.js；创建 README/CLAUDE.md/AGENTS.md/docs/* | `npm run dev` 可运行；docs 存在；范围清晰 | ✅ 完成 |
 | Phase 1 | Ticket 类型、mock 数据、ticket utils | 页面可读 mock data；不滥用 any | ✅ 完成 |
 | Phase 2 | Dashboard 统计、筛选、搜索、列表 | 可按状态/优先级筛选；搜索可用；空状态可用 | ✅ 完成 |
-| Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ⬜ 待开始 |
+| Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ✅ 完成 |
 | Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ⬜ 待开始 |
 | Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ⬜ 待开始 |
 | Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ⬜ 待开始 |
@@ -57,17 +57,31 @@
   - 微交互打磨：hover 悬浮抬升（cubic-bezier 丝滑缓动）；进场卡片"逐个浮现"（`.rise` fade-up +
     错开 animation-delay）。入场放外层包裹、hover 放卡片本身分层，避免动画 fill 顶掉 hover；
     遵循 `prefers-reduced-motion`。
+- **Codex Review — Phase 2**
+  - 已 review Dashboard 页面、filters/list/card/badge/stat 组件、CSS tokens、D6 决策记录。
+  - `npm run lint` 与 `npm run build` 均通过。
+  - 浏览器验证通过：页面加载、状态筛选、优先级筛选、搜索无结果、清除筛选、移动端首屏。
+  - `docs/codex-review.md` 已追加 Phase 2 review；未发现高优先级阻塞问题。
+
+- **Phase 3 — Ticket Detail Page**（`/tickets/[id]`）
+  - `src/app/tickets/[id]/page.tsx`：Server Component，`params: Promise<{id}>` 并 `await params`；
+    `getTicketById` 查不到时渲染友好"未找到工单"组件（非默认 404）；`generateMetadata` 动态标题。
+  - `ticket-detail.tsx`（client）：本地 state 管理状态切换与新增备注（仅内存），复用 StatusBadge /
+    PriorityBadge / formatDateTime / STATUS_ORDER / CATEGORY_LABELS。
+  - `activity-timeline.tsx`：发丝竖线 + 彩色圆点的处理记录时间线，复用 ACTIVITY_TYPE_LABELS。
+  - 操作：更改状态（select，追加 status_changed 活动 + 更新 updatedAt）、添加内部备注（追加 note 活动）。
+  - 处理 Codex Phase 1 P3：为 TKT-1005 / 1007 / 1008 补齐 open→in_progress 中间状态变更活动。
+  - `npm run lint` / `npm run build` 通过；浏览器验证：详情渲染、改状态、加备注、无效 id 友好、无 console 报错。
 
 ## Next（下一步）
-- **Phase 3 — Ticket Detail Page**（`/tickets/[id]`）
-  - 注意 Next.js 16：`params` 是 **Promise**，页面需 `await params`。
-  - `ticket-detail.tsx` + 活动时间线组件；复用 StatusBadge / PriorityBadge / formatDateTime /
-    ACTIVITY_TYPE_LABELS / getTicketById。
-  - 操作：Change status、Add internal note（仅更新内存状态）。
-  - 无效 id 的友好"未找到工单"提示。
-  - 顺带处理 Codex Phase 1 P3：补齐部分 mock 工单缺失的 open→in_progress 中间状态变更活动。
-- **Phase 3 Review Focus**
-  - `await params` 用法正确；无效 id 友好处理；timeline 可读；状态更新逻辑清晰。
+- **Phase 4 — Create Ticket Page**（`/tickets/new`）
+  - 受控表单：requesterName / email / title / category / priority / description。
+  - 基本校验（必填、邮箱格式）+ 友好行内错误提示。
+  - 提交后模拟创建（内存）/ 显示成功，再跳转列表或详情。
+  - 解决 "+ 新建工单" 链接的 404（Codex Phase 2 P2 的剩余一半）。
+  - 不实现真实数据库、登录、审批流。
+- **Phase 4 Review Focus**
+  - 校验逻辑、表单 label 可访问性、提交后流程清晰、不过度设计。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -76,9 +90,14 @@
 - README 当前描述的是目标 MVP 功能，不是已完成功能；后续阶段需要逐步更新，或在 Phase 6 明确区分
   planned / implemented。
 - ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
-- 少数 mock activity 文案跳过了中间状态变化；不影响 Phase 2，计划在 Phase 3 做 timeline 时补齐。
-- `formatRelativeTime()` 默认使用 `Date.now()`；当前首页是 client component，列表统一用 `formatDateTime()`
-  （确定性 UTC 输出），暂无 hydration 风险。
+- ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
+- `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），
+  新增活动的时间在事件回调里生成（非渲染期），无 hydration 风险。
+- ~~ticket card → `/tickets/[id]` 链接 404~~：已在 Phase 3 实现详情页。仍有 "+ 新建工单" →
+  `/tickets/new`（Phase 4 解决；在此之前点击会进入默认 404）。
+- 详情页的状态切换 / 新增备注仅更新内存，刷新后重置（mock 设计预期，UI 已注明）。
+- 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
+  可按视觉/交互偏好决定是否保留。
 
 ## 后续扩展方向（不在 MVP 内）
 - 加入 Supabase / Firebase 存储真实 tickets。

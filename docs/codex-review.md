@@ -84,3 +84,43 @@
 3. Use the existing `STATUS_ORDER`, `PRIORITY_ORDER`, labels, and badge class maps instead of duplicating display strings in components.
 4. Keep components small and obvious: `StatusBadge`, `PriorityBadge`, `StatCard`, `TicketFilters`, `TicketCard` or `TicketList`.
 5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.
+
+### Phase 2 — Dashboard + Ticket List
+- 状态：✅ Reviewed by Codex on 2026-06-17
+
+#### Summary
+- Phase 2 matches `docs/project-brief.md`, `docs/frontend-spec.md`, and `docs/tasks.md`: dashboard stats, status filter, priority filter, search, sorted ticket list, and no-results empty state are implemented.
+- Component structure is clean and beginner-friendly: `StatCard`, `TicketFilters`, `TicketList`, `TicketCard`, `StatusBadge`, and `PriorityBadge` each have a narrow purpose.
+- MVP scope is still controlled. No database, auth, state library, UI library, server actions, or real AI API were added.
+- The Typora-style direction is recorded in `docs/decisions.md` D6 and implemented consistently with CSS tokens plus centralized dot color maps.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Browser smoke test on `http://localhost:3000` ✅
+  - Page identity: `Ticket Assistant — 轻量 IT 工单管理`
+  - Console errors/warnings: none observed
+  - Status card filter: Open card shows `3 条结果` and sets `aria-pressed`
+  - Priority filter: Open + High shows `2 条结果`
+  - Search empty state: unmatched search shows `0 条结果` + "没有匹配的工单"
+  - Clear filters: resets search, priority, status, and returns to `10 条结果`
+  - Mobile viewport `390x844`: no horizontal overflow observed
+
+#### Findings
+- **P2 — Visible links navigate to routes that do not exist yet.** Ticket cards link to `/tickets/[id]` and the primary "+ 新建工单" link points to `/tickets/new`, but the build currently only contains `/` and `/_not-found`. Clicking a ticket card currently lands on the default Next 404. This is expected if Phase 3/4 will add those routes, but it is a real user-facing broken path during Phase 2. Recommendation: proceed to Phase 3 to implement `/tickets/[id]`; consider hiding, disabling, or clearly treating "+ 新建工单" as a Phase 4 placeholder until `/tickets/new` exists.
+- **P3 — Empty state shows two "清除筛选" buttons when there are no matching results.** One appears in the filter bar and one in the empty-state panel. Both work, so this is not a functional bug, but the duplicate action is a small UX choice to revisit during polish.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- The dashboard uses local `useState`/`useMemo`, which is correct for the MVP.
+- Keeping filters out of URL `searchParams` avoids unnecessary Next.js 16 complexity at this stage.
+- `formatDateTime()` is used for list dates, avoiding the `Date.now()` hydration risk noted in Phase 1.
+
+#### Next Actions For Claude Code
+1. Start Phase 3 and implement `/tickets/[id]` first, because the dashboard now links to detail pages.
+2. In Next.js 16, type route props as `params: Promise<{ id: string }>` and `await params`.
+3. Add a friendly invalid-id state instead of letting unknown ticket URLs fall through to the default 404.
+4. Reuse `StatusBadge`, `PriorityBadge`, `getTicketById`, `formatDateTime`, and `ACTIVITY_TYPE_LABELS`.
+5. Do not implement create-ticket or AI reply in Phase 3 unless the owner explicitly changes scope.
