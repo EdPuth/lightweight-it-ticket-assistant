@@ -10,7 +10,7 @@
 | Phase 1 | Ticket 类型、mock 数据、ticket utils | 页面可读 mock data；不滥用 any | ✅ 完成 |
 | Phase 2 | Dashboard 统计、筛选、搜索、列表 | 可按状态/优先级筛选；搜索可用；空状态可用 | ✅ 完成 |
 | Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ✅ 完成 |
-| Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ⬜ 待开始 |
+| Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ✅ 完成 |
 | Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ⬜ 待开始 |
 | Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ⬜ 待开始 |
 
@@ -78,17 +78,28 @@
   - 浏览器验证通过：详情渲染、动态标题、状态切换、新增备注、无效 id 友好页面、移动端首屏。
   - `docs/codex-review.md` 已追加 Phase 3 review；未发现高优先级阻塞问题。
 
+- **本地化 — 产品 UI 改英文**（决策 D7）
+  - mock 工单（标题/描述/活动）、ticket-utils 的 ACTIVITY_TYPE_LABELS 与 formatRelativeTime、
+    Dashboard / filters / list / card / detail / `[id]` route / layout metadata、`<html lang="en">`
+    全部英文。docs 仍中文（Owner 偏好）。`lint`/`build` 通过。
+- **Phase 4 — Create Ticket Page**（`/tickets/new`，英文）
+  - `src/app/tickets/new/page.tsx`（client）：受控表单 requesterName / email / title /
+    category / priority / description；复用 CATEGORY_/PRIORITY_ ORDER + LABELS。
+  - 校验：必填 + 邮箱格式；行内错误（红框 + 字段下方提示）；可访问（label htmlFor、
+    aria-invalid、aria-describedby）；编辑字段即清除该项错误。
+  - 提交：因无后端/store（不引入 Zustand），采用**原地成功确认**（显示生成 id + 标题 +
+    "mock 不持久化" 说明 + Create another / Back to dashboard），而非跳详情页导致 404。
+  - 解决 "+ 新建工单" → `/tickets/new` 的 404（Codex Phase 2 P2 剩余一半）。
+  - `npm run lint` / `npm run build` 通过；浏览器验证：空提交报错、合法提交成功、无 console 报错。
+
 ## Next（下一步）
-- **Phase 4 — Create Ticket Page**（`/tickets/new`）
-  - 受控表单：requesterName / email / title / category / priority / description。
-  - 基本校验（必填、邮箱格式）+ 友好行内错误提示。
-  - 提交后模拟创建（内存）/ 显示成功，再跳转列表或详情。
-  - 解决 "+ 新建工单" 链接的 404（Codex Phase 2 P2 的剩余一半）。
-  - 表单必须有可访问 label；错误信息应靠近对应字段。
-  - 不实现真实数据库、登录、审批流。
-- **Phase 4 Review Focus**
-  - 校验逻辑、表单 label 可访问性、提交后流程清晰、不过度设计。
-  - mock 提交后的数据持久性要诚实标注：刷新后重置是预期。
+- **Phase 5 — AI Suggested Reply（mock）**
+  - 详情页加 `ai-suggested-reply.tsx`；`generateSuggestedReply(ticket)` 本地模板（不接真实 LLM）。
+  - 状态 idle → loading（skeleton/文字）→ generated；Copy / Insert as reply 按钮；
+    明显标注 "AI suggested draft — review before sending"。
+  - "Insert as reply" 可把草稿作为一条 reply 活动加入时间线（内存）。
+- **Phase 5 Review Focus**
+  - mock 诚实标注、无真实 API 代码；loading/生成/复制状态可用；不破坏详情页现有逻辑。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -100,9 +111,10 @@
 - ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
 - `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），
   新增活动的时间在事件回调里生成（非渲染期），无 hydration 风险。
-- ~~ticket card → `/tickets/[id]` 链接 404~~：已在 Phase 3 实现详情页。仍有 "+ 新建工单" →
-  `/tickets/new`（Phase 4 解决；在此之前点击会进入默认 404）。
-- 详情页的状态切换 / 新增备注仅更新内存，刷新后重置（mock 设计预期，UI 已注明）。
+- ~~ticket card / "+ New ticket" 链接 404~~：详情页（Phase 3）与创建页（Phase 4）均已实现。
+- 详情页状态切换 / 新增备注、创建页提交均仅内存，刷新后重置（mock 设计预期，UI 已注明）。
+- 创建的工单不会出现在列表/详情里（无共享 store）；这是 mock 限制，成功页已说明。Phase 6 可在
+  README 的 limitations 里写清楚。
 - 详情页 metadata 字段使用 `dt` / `dd`，但外层当前不是显式 `<dl>`；功能不受影响，后续若改动详情页
   可顺手调整语义结构。
 - 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
