@@ -47,3 +47,14 @@
 - **理由**：贴合 Owner 的 Typora 审美；克制单色 + 留白让信息清晰、易 review。
 - **影响**：颜色 token 与字体集中在 `globals.css` 的 `@theme`；圆点配色集中在 `ticket-utils.ts`
   的 `STATUS_DOT_CLASS` / `PRIORITY_DOT_CLASS`，组件不各自硬编码。后续页面沿用这套语言。
+
+## D7 — 产品 UI 语言改为英文
+- **背景**：Owner 在 Phase 4 前明确这个系统面向英语用户，要求把界面元素都改成英文。
+- **决定**：
+  - 所有**用户可见文案**改为英文：mock 工单标题/描述/活动记录、各页面文案、表单 label、占位符、
+    空状态、徽标/活动类型 label、相对时间文案、metadata、`<html lang="en">`。
+  - 状态/优先级/分类 label 本就是英文，保持不变。
+  - **内部文档**（`docs/*`、tasks/decisions/codex-review）与 Owner 沟通**仍用中文**（Owner 偏好）。
+  - 代码注释为降低改动面暂保留中文；Phase 4 起新写代码的注释用英文。
+- **理由**：产品受众是英语用户；文档受众是 Owner（偏好中文），两者分开处理最合理。
+- **影响**：本地化作为 Phase 4 前的独立 commit；之后所有新 UI 一律英文。

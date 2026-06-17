@@ -38,14 +38,14 @@ export function TicketFilters({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="搜索标题、请求人、邮箱或工单号…"
-          aria-label="搜索工单"
+          placeholder="Search by title, requester, email, or ticket ID…"
+          aria-label="Search tickets"
           className="w-full rounded-xl border border-border bg-surface py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
         />
       </div>
 
       <label className="sr-only" htmlFor="priority-filter">
-        按优先级筛选
+        Filter by priority
       </label>
       <select
         id="priority-filter"
@@ -55,7 +55,7 @@ export function TicketFilters({
         }
         className="rounded-xl border border-border bg-surface py-2.5 pl-3 pr-8 text-sm text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
       >
-        <option value="all">全部优先级</option>
+        <option value="all">All priorities</option>
         {PRIORITY_ORDER.map((value) => (
           <option key={value} value={value}>
             {PRIORITY_LABELS[value]}
@@ -69,7 +69,7 @@ export function TicketFilters({
           onClick={onClear}
           className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
         >
-          清除筛选
+          Clear filters
         </button>
       ) : null}
     </div>

@@ -72,6 +72,11 @@
   - 操作：更改状态（select，追加 status_changed 活动 + 更新 updatedAt）、添加内部备注（追加 note 活动）。
   - 处理 Codex Phase 1 P3：为 TKT-1005 / 1007 / 1008 补齐 open→in_progress 中间状态变更活动。
   - `npm run lint` / `npm run build` 通过；浏览器验证：详情渲染、改状态、加备注、无效 id 友好、无 console 报错。
+- **Codex Review — Phase 3**
+  - 已 review `/tickets/[id]` route、`ticket-detail.tsx`、`activity-timeline.tsx` 和 mock timeline 补齐。
+  - `npm run lint` 与 `npm run build` 均通过；build 输出包含动态路由 `/tickets/[id]`。
+  - 浏览器验证通过：详情渲染、动态标题、状态切换、新增备注、无效 id 友好页面、移动端首屏。
+  - `docs/codex-review.md` 已追加 Phase 3 review；未发现高优先级阻塞问题。
 
 ## Next（下一步）
 - **Phase 4 — Create Ticket Page**（`/tickets/new`）
@@ -79,9 +84,11 @@
   - 基本校验（必填、邮箱格式）+ 友好行内错误提示。
   - 提交后模拟创建（内存）/ 显示成功，再跳转列表或详情。
   - 解决 "+ 新建工单" 链接的 404（Codex Phase 2 P2 的剩余一半）。
+  - 表单必须有可访问 label；错误信息应靠近对应字段。
   - 不实现真实数据库、登录、审批流。
 - **Phase 4 Review Focus**
   - 校验逻辑、表单 label 可访问性、提交后流程清晰、不过度设计。
+  - mock 提交后的数据持久性要诚实标注：刷新后重置是预期。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -96,6 +103,8 @@
 - ~~ticket card → `/tickets/[id]` 链接 404~~：已在 Phase 3 实现详情页。仍有 "+ 新建工单" →
   `/tickets/new`（Phase 4 解决；在此之前点击会进入默认 404）。
 - 详情页的状态切换 / 新增备注仅更新内存，刷新后重置（mock 设计预期，UI 已注明）。
+- 详情页 metadata 字段使用 `dt` / `dd`，但外层当前不是显式 `<dl>`；功能不受影响，后续若改动详情页
+  可顺手调整语义结构。
 - 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
   可按视觉/交互偏好决定是否保留。
 

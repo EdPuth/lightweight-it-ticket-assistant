@@ -37,7 +37,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       id: nextActivityId(),
       type: "status_changed",
       author: "IT Support",
-      content: `状态从 ${STATUS_LABELS[status]} 变更为 ${STATUS_LABELS[next]}。`,
+      content: `Status changed from ${STATUS_LABELS[status]} to ${STATUS_LABELS[next]}.`,
       createdAt: new Date().toISOString(),
     });
     setStatus(next);
@@ -62,7 +62,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
         href="/"
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 rounded"
       >
-        <span aria-hidden="true">←</span> 返回工单列表
+        <span aria-hidden="true">←</span> Back to tickets
       </Link>
 
       <header className="mt-6">
@@ -82,15 +82,15 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       </header>
 
       <section className="mt-6 grid gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
-        <DetailField label="请求人" value={ticket.requesterName} />
-        <DetailField label="邮箱" value={ticket.requesterEmail} mono />
-        <DetailField label="负责人" value={ticket.assignedTo ?? "未分配"} />
-        <DetailField label="创建于" value={formatDateTime(ticket.createdAt)} />
-        <DetailField label="最近更新" value={formatDateTime(updatedAt)} />
+        <DetailField label="Requester" value={ticket.requesterName} />
+        <DetailField label="Email" value={ticket.requesterEmail} mono />
+        <DetailField label="Assignee" value={ticket.assignedTo ?? "Unassigned"} />
+        <DetailField label="Created" value={formatDateTime(ticket.createdAt)} />
+        <DetailField label="Last updated" value={formatDateTime(updatedAt)} />
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-medium text-muted">问题描述</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Description</h2>
         <div className="rounded-xl border border-border bg-surface px-5 py-4 text-sm leading-relaxed text-foreground/90 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           {ticket.description}
         </div>
@@ -101,7 +101,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           htmlFor="status-select"
           className="text-sm font-medium text-foreground"
         >
-          更改状态
+          Change status
         </label>
         <select
           id="status-select"
@@ -120,19 +120,19 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-4 text-sm font-medium text-muted">处理记录</h2>
+        <h2 className="mb-4 text-sm font-medium text-muted">Activity</h2>
         <ActivityTimeline activities={activities} />
 
         <div className="mt-5">
           <label htmlFor="note-input" className="sr-only">
-            添加内部备注
+            Add an internal note
           </label>
           <textarea
             id="note-input"
             value={noteDraft}
             onChange={(event) => setNoteDraft(event.target.value)}
             rows={3}
-            placeholder="添加内部备注…（仅内存，刷新后重置）"
+            placeholder="Add an internal note… (in-memory only, resets on refresh)"
             className="w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
           />
           <div className="mt-2 flex justify-end">
@@ -142,7 +142,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
               disabled={!noteDraft.trim()}
               className="ticket-card rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
-              添加备注
+              Add note
             </button>
           </div>
         </div>

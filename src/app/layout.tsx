@@ -24,9 +24,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ticket Assistant — 轻量 IT 工单管理",
+  title: "Ticket Assistant — Lightweight IT Support",
   description:
-    "轻量的 IT 支持工单管理助手：查看统计、筛选/搜索工单、跟踪处理记录（练习项目，使用 mock 数据）。",
+    "A lightweight IT support ticket assistant: view stats, filter and search tickets, and track activity (practice project using mock data).",
 };
 
 export default function RootLayout({
@@ -36,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="zh-CN"
+      lang="en"
       className={`${fraunces.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">

@@ -30,7 +30,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
         <span aria-hidden="true" className="text-faint">·</span>
         <span>{CATEGORY_LABELS[ticket.category]}</span>
         <span aria-hidden="true" className="text-faint">·</span>
-        <span>更新于 {formatDateTime(ticket.updatedAt)}</span>
+        <span>Updated {formatDateTime(ticket.updatedAt)}</span>
         <span className="ml-auto">
           <PriorityBadge priority={ticket.priority} />
         </span>

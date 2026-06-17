@@ -16,12 +16,12 @@ export function TicketList({
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface/60 px-6 py-16 text-center">
         <p className="font-serif text-lg text-foreground">
-          {hasActiveFilters ? "没有匹配的工单" : "还没有任何工单"}
+          {hasActiveFilters ? "No matching tickets" : "No tickets yet"}
         </p>
         <p className="mt-1.5 text-sm text-muted">
           {hasActiveFilters
-            ? "试着调整搜索词或筛选条件。"
-            : "新建工单后会出现在这里。"}
+            ? "Try adjusting your search or filters."
+            : "New tickets will show up here."}
         </p>
         {hasActiveFilters ? (
           <button
@@ -29,7 +29,7 @@ export function TicketList({
             onClick={onClearFilters}
             className="mt-5 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
           >
-            清除筛选
+            Clear filters
           </button>
         ) : null}
       </div>

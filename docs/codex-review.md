@@ -124,3 +124,43 @@
 3. Add a friendly invalid-id state instead of letting unknown ticket URLs fall through to the default 404.
 4. Reuse `StatusBadge`, `PriorityBadge`, `getTicketById`, `formatDateTime`, and `ACTIVITY_TYPE_LABELS`.
 5. Do not implement create-ticket or AI reply in Phase 3 unless the owner explicitly changes scope.
+
+### Phase 3 — Ticket Detail Page + Activity Timeline
+- 状态：✅ Reviewed by Codex on 2026-06-17
+
+#### Summary
+- Phase 3 matches `docs/project-brief.md`, `docs/frontend-spec.md`, and `docs/tasks.md`: `/tickets/[id]` exists, dashboard ticket links now have a real target, invalid ids render a friendly state, and the detail page includes request metadata, description, status change, internal notes, and an activity timeline.
+- Next.js 16 route props are handled correctly with `params: Promise<{ id: string }>` and `await params`.
+- Scope is controlled: no database, auth, create-ticket form, AI reply, or new dependency was added.
+- Phase 1 timeline cleanup was handled by adding the missing `open → in_progress` mock activities for TKT-1005, TKT-1007, and TKT-1008.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Build output includes dynamic route `/tickets/[id]` ✅
+- Browser smoke test on `http://localhost:3000` ✅
+  - Direct detail URL `/tickets/TKT-1010` renders expected ticket content and dynamic title
+  - Status select changes `In Progress` to `Resolved`, updates the badge/select, and appends a `status_changed` activity
+  - Add-note flow enables the button only after text input, appends a `note` activity, clears the textarea, and disables the button again
+  - Invalid URL `/tickets/NOPE-404` renders "未找到这张工单" with navigation back to Dashboard
+  - Mobile viewport `390x844`: no horizontal overflow observed on the detail page
+  - Console errors/warnings: none observed
+
+#### Findings
+- **P3 — Detail metadata fields use `dt`/`dd` without an explicit `dl` wrapper.** The browser still exposes them as term/definition in the accessibility snapshot, and this is not blocking, but the markup would be more correct if the metadata card were a `<dl>` with `DetailField` returning a wrapped term/definition pair.
+- **P3 — "+ 新建工单" still points to an unimplemented route.** The ticket-card 404 from Phase 2 is fixed, but `/tickets/new` remains a default 404 until Phase 4. This is already the next planned phase.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- The status and note changes are correctly local-only mock interactions and reset on refresh, matching the MVP decision.
+- `formatDateTime()` remains the right choice for rendered timestamps; new local activities call `new Date()` inside event handlers, avoiding hydration risk.
+- Keep Phase 4 focused on `/tickets/new`; do not add persistence beyond the existing in-memory/mock behavior unless the owner changes scope.
+
+#### Next Actions For Claude Code
+1. Start Phase 4 and implement `/tickets/new` to remove the remaining visible 404 path from the Dashboard.
+2. Use a controlled form with accessible labels, inline validation, and a clear mock-submit success path.
+3. Keep submit behavior honest: data is mock/in-memory only and will not survive refresh unless the project later adds storage.
+4. Optionally replace the detail metadata card with a semantic `<dl>` while touching nearby detail markup, but do not turn it into a larger refactor.
+5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.

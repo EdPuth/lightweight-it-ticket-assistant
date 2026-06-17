@@ -53,14 +53,14 @@ export default function DashboardPage() {
             Ticket Assistant
           </h1>
           <p className="mt-1.5 text-sm text-muted">
-            轻量 IT 工单管理 · 共 {mockTickets.length} 张工单
+            Lightweight IT support · {mockTickets.length} tickets total
           </p>
         </div>
         <Link
           href="/tickets/new"
           className="shrink-0 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
         >
-          + 新建工单
+          + New ticket
         </Link>
       </header>
 
@@ -95,7 +95,8 @@ export default function DashboardPage() {
       <section className="mt-5">
         <div className="mb-3 flex items-center justify-between px-1">
           <span className="text-xs text-faint">
-            {visibleTickets.length} 条结果
+            {visibleTickets.length}{" "}
+            {visibleTickets.length === 1 ? "result" : "results"}
           </span>
         </div>
         <TicketList

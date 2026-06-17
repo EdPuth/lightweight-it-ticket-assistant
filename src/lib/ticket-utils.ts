@@ -37,10 +37,10 @@ export const CATEGORY_LABELS: Record<TicketCategory, string> = {
 };
 
 export const ACTIVITY_TYPE_LABELS: Record<TicketActivityType, string> = {
-  created: '创建',
-  status_changed: '状态变更',
-  note: '内部备注',
-  reply: '回复',
+  created: 'Created',
+  status_changed: 'Status changed',
+  note: 'Internal note',
+  reply: 'Reply',
 };
 
 // 状态 / 优先级的圆点颜色（Tailwind 实心色）。
@@ -194,14 +194,14 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
   const diffMs = now - time;
   const diffMin = Math.floor(diffMs / 60000);
 
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin} 分钟前`;
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
 
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} 小时前`;
+  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
 
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay} 天前`;
+  if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
 
   return formatDateTime(iso);
 }
