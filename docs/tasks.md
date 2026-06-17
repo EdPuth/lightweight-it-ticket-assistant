@@ -109,6 +109,13 @@
   - `npm run lint` / `npm run build` 通过；浏览器验证：生成（Outlook ticket 命中模板）、复制、
     Insert as reply 入时间线、无 console 报错。
 
+- **Enhancement — 详情页 Assignee 可手动选择**（Owner 要求）
+  - `ticket-utils.ts` 新增 `TECHNICIANS = ['Kyle','John','Kevin']`（集中、可增减）。
+  - `ticket-detail.tsx`：Assignee 从只读改为 `<select>`（Unassigned + 技师；若工单原 assignee
+    不在名单内，如 "IT - Daniel"，自动并入选项以反映真实值）；切换时追加一条 note 活动
+    "Assigned to X." / "Unassigned." 并更新 metadata。仅内存。
+  - `lint` / `build` 通过；浏览器验证：选项正确、切换更新 metadata + 时间线、无 console 报错。
+
 ## Next（下一步）
 - **Phase 6 — Polish, Accessibility, README**
   - 响应式 / 键盘焦点 / 对比度复查；统一 loading/error 状态。

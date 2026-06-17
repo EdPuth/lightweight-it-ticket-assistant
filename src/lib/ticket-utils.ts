@@ -83,6 +83,9 @@ export const CATEGORY_ORDER: TicketCategory[] = [
   'other',
 ];
 
+// Selectable technicians for ticket assignment. Add or edit names here.
+export const TECHNICIANS: string[] = ['Kyle', 'John', 'Kevin'];
+
 // ---------------------------------------------------------------------------
 // 纯查询 / 筛选函数：不修改入参，始终返回新数组。
 // ---------------------------------------------------------------------------

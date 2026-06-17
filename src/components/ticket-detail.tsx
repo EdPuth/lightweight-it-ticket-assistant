@@ -8,6 +8,7 @@ import {
   formatDateTime,
   STATUS_LABELS,
   STATUS_ORDER,
+  TECHNICIANS,
 } from "@/lib/ticket-utils";
 import { StatusBadge } from "./status-badge";
 import { PriorityBadge } from "./priority-badge";
@@ -21,7 +22,16 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
     ticket.activities,
   );
   const [updatedAt, setUpdatedAt] = useState(ticket.updatedAt);
+  const [assignee, setAssignee] = useState(ticket.assignedTo ?? "");
   const [noteDraft, setNoteDraft] = useState("");
+
+  // Build the assignee options: Unassigned + known technicians, plus the
+  // ticket's current assignee if it isn't already in the list (e.g. seeded
+  // mock data like "IT - Daniel"), so the select always reflects reality.
+  const assigneeOptions = [
+    ...TECHNICIANS,
+    ...(assignee && !TECHNICIANS.includes(assignee) ? [assignee] : []),
+  ];
 
   // 为新增的本地活动生成唯一 id（仅内存使用）。
   const localSeq = useRef(0);
@@ -55,6 +65,18 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       createdAt: new Date().toISOString(),
     });
     setNoteDraft("");
+  };
+
+  const handleAssigneeChange = (next: string) => {
+    if (next === assignee) return;
+    appendActivity({
+      id: nextActivityId(),
+      type: "note",
+      author: "IT Support",
+      content: next ? `Assigned to ${next}.` : "Unassigned.",
+      createdAt: new Date().toISOString(),
+    });
+    setAssignee(next);
   };
 
   // Insert an AI-suggested draft into the timeline as a reply activity.
@@ -96,7 +118,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       <dl className="mt-6 grid gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
         <DetailField label="Requester" value={ticket.requesterName} />
         <DetailField label="Email" value={ticket.requesterEmail} mono />
-        <DetailField label="Assignee" value={ticket.assignedTo ?? "Unassigned"} />
+        <DetailField label="Assignee" value={assignee || "Unassigned"} />
         <DetailField label="Created" value={formatDateTime(ticket.createdAt)} />
         <DetailField label="Last updated" value={formatDateTime(updatedAt)} />
       </dl>
@@ -108,27 +130,51 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
         </div>
       </section>
 
-      <section className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between">
-        <label
-          htmlFor="status-select"
-          className="text-sm font-medium text-foreground"
-        >
-          Change status
-        </label>
-        <select
-          id="status-select"
-          value={status}
-          onChange={(event) =>
-            handleStatusChange(event.target.value as TicketStatus)
-          }
-          className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
-        >
-          {STATUS_ORDER.map((value) => (
-            <option key={value} value={value}>
-              {STATUS_LABELS[value]}
-            </option>
-          ))}
-        </select>
+      <section className="mt-6 grid gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor="status-select"
+            className="text-sm font-medium text-foreground"
+          >
+            Change status
+          </label>
+          <select
+            id="status-select"
+            value={status}
+            onChange={(event) =>
+              handleStatusChange(event.target.value as TicketStatus)
+            }
+            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          >
+            {STATUS_ORDER.map((value) => (
+              <option key={value} value={value}>
+                {STATUS_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor="assignee-select"
+            className="text-sm font-medium text-foreground"
+          >
+            Assignee
+          </label>
+          <select
+            id="assignee-select"
+            value={assignee}
+            onChange={(event) => handleAssigneeChange(event.target.value)}
+            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          >
+            <option value="">Unassigned</option>
+            {assigneeOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
       </section>
 
       <AiSuggestedReply ticket={ticket} onInsert={handleInsertReply} />
