@@ -11,7 +11,7 @@
 | Phase 2 | Dashboard 统计、筛选、搜索、列表 | 可按状态/优先级筛选；搜索可用；空状态可用 | ✅ 完成 |
 | Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ✅ 完成 |
 | Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ✅ 完成 |
-| Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ⬜ 待开始 |
+| Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ✅ 完成 |
 | Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ⬜ 待开始 |
 
 ---
@@ -91,15 +91,32 @@
     "mock 不持久化" 说明 + Create another / Back to dashboard），而非跳详情页导致 404。
   - 解决 "+ 新建工单" → `/tickets/new` 的 404（Codex Phase 2 P2 剩余一半）。
   - `npm run lint` / `npm run build` 通过；浏览器验证：空提交报错、合法提交成功、无 console 报错。
+- **Codex Review — Phase 4**
+  - 已 review `/tickets/new` 表单、英文 UI 本地化、D7 决策记录和 mock 提交流程。
+  - `npm run lint` 与 `npm run build` 均通过；build 输出包含静态路由 `/tickets/new`。
+  - 浏览器验证通过：空提交错误、邮箱格式错误、字段错误清除、合法提交成功、Create another 重置、
+    Back to dashboard、移动端首屏。
+  - `docs/codex-review.md` 已追加 Phase 4 review；未发现高优先级阻塞问题。
+
+- **Phase 5 — AI Suggested Reply（mock）**
+  - `src/lib/reply-templates.ts`：数据驱动方案模板库 `solutionTemplates`（含 .ost 过满、inbox
+    访问、Outlook classic 同步三例）+ 纯函数 `matchScore` / `findRelevantTemplates` /
+    `generateSuggestedReply`（无真实 LLM）。为后续知识库 / 关键词搜索预留扩展点（决策 D8）。
+  - `ai-suggested-reply.tsx`：idle → loading（skeleton）→ generated；可编辑草稿；
+    Copy / Insert as reply / Regenerate；醒目 "Suggested draft — review before sending" 标注。
+  - 接入 `ticket-detail.tsx`：`handleInsertReply` 复用现有本地 timeline state，追加 reply 活动。
+  - 顺带处理 Codex P3：创建页 mock id 改为 timestamp-based；详情 metadata 改为语义 `<dl>`。
+  - `npm run lint` / `npm run build` 通过；浏览器验证：生成（Outlook ticket 命中模板）、复制、
+    Insert as reply 入时间线、无 console 报错。
 
 ## Next（下一步）
-- **Phase 5 — AI Suggested Reply（mock）**
-  - 详情页加 `ai-suggested-reply.tsx`；`generateSuggestedReply(ticket)` 本地模板（不接真实 LLM）。
-  - 状态 idle → loading（skeleton/文字）→ generated；Copy / Insert as reply 按钮；
-    明显标注 "AI suggested draft — review before sending"。
-  - "Insert as reply" 可把草稿作为一条 reply 活动加入时间线（内存）。
-- **Phase 5 Review Focus**
-  - mock 诚实标注、无真实 API 代码；loading/生成/复制状态可用；不破坏详情页现有逻辑。
+- **Phase 6 — Polish, Accessibility, README**
+  - 响应式 / 键盘焦点 / 对比度复查；统一 loading/error 状态。
+  - 处理遗留 P3：无结果时两个 "Clear filters" 按钮的取舍。
+  - 完成 README：区分 planned / implemented；写清 mock 限制（创建不持久、刷新重置）。
+  - 更新 `docs/tasks.md` 的后续扩展方向（含 Owner 提到的知识库 / 关键词搜索）。
+- **Phase 6 Review Focus**
+  - 响应式 / a11y 基础、README 准确性、范围把控（MVP 没长成企业级系统）。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -115,6 +132,8 @@
 - 详情页状态切换 / 新增备注、创建页提交均仅内存，刷新后重置（mock 设计预期，UI 已注明）。
 - 创建的工单不会出现在列表/详情里（无共享 store）；这是 mock 限制，成功页已说明。Phase 6 可在
   README 的 limitations 里写清楚。
+- 创建页 mock id 使用随机数生成，理论上可能和现有 mock ticket id 重复；不影响功能，演示时若介意可改成
+  timestamp-based mock id。
 - 详情页 metadata 字段使用 `dt` / `dd`，但外层当前不是显式 `<dl>`；功能不受影响，后续若改动详情页
   可顺手调整语义结构。
 - 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
@@ -125,3 +144,8 @@
 - 登录与角色权限：employee / IT support / admin。
 - 接入真实 AI API 生成回复、分类和优先级建议。
 - 部署到 Vercel。
+- **（Owner 提出）关键词搜索以往 ticket**：technician 用 Outlook / email 等关键词找到历史相关工单。
+  扩展点已就绪：复用 `reply-templates.ts` 的 `matchScore`，并让 `searchTickets` 也匹配 `description`。
+- **（Owner 提出）邮箱问题知识库**：把常见解决方案做成文档（.ost 过满、申请他人 inbox 访问、
+  Outlook classic 无法同步等）。`reply-templates.ts` 的 `solutionTemplates` 已作为数据种子，
+  后续渲染成独立文章页即可（详见决策 D8）。

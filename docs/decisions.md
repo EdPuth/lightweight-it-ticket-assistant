@@ -58,3 +58,22 @@
   - 代码注释为降低改动面暂保留中文；Phase 4 起新写代码的注释用英文。
 - **理由**：产品受众是英语用户；文档受众是 Owner（偏好中文），两者分开处理最合理。
 - **影响**：本地化作为 Phase 4 前的独立 commit；之后所有新 UI 一律英文。
+
+## D8 — AI 建议回复用「数据驱动的方案模板库」，为后续功能预留扩展点
+- **背景**：Phase 5 做 mock AI 回复；同时 Owner 提到后续想加两个功能：
+  (1) technician 用关键词（如 Outlook、email）搜索以往处理过的相关 ticket；
+  (2) 一个常见邮箱问题的解决方案知识库（如 .ost 过满、申请他人 inbox 访问、Outlook classic 无法同步）。
+  Owner 明确**现在不实现**，但希望代码保持灵活、以后好加。
+- **决定**：
+  - 把可复用内容沉淀到 `src/lib/reply-templates.ts` 的 `solutionTemplates`（`{ id, title,
+    category, keywords[], body }` 列表），已预置上述三个邮箱方案。
+  - 暴露纯函数 `matchScore(template, ticket)` 与 `findRelevantTemplates(ticket)`（按 category +
+    keyword 命中打分排序），`generateSuggestedReply(ticket)` 基于它们组合草稿；无真实 LLM。
+- **理由**：这三者形状一致——AI 回复、关键词搜索、知识库都依赖"按关键词/类别匹配文本"。统一成
+  一份数据 + 一个打分函数，后续功能就是"加数据 + 加页面"，不用重构。
+- **影响 / 扩展路径**：
+  - 知识库功能：直接把 `solutionTemplates` 渲染成独立文章页即可，数据已就绪。
+  - 关键词搜索：复用 `matchScore` / `findRelevantTemplates`；若要搜 ticket 正文，扩展
+    `ticket-utils.ts` 的 `searchTickets` 让它也匹配 `description`（当前仅 id/title/requester/email）。
+  - 真实 LLM：把 `generateSuggestedReply` 内部换成 API 调用即可，签名 `(ticket) => string` 不变
+    （改 async）；组件状态机（idle/loading/generated）已适配异步。

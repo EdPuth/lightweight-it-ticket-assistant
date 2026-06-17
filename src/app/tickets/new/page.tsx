@@ -67,7 +67,8 @@ export default function NewTicketPage() {
     }
     // Mock "create": generate a display id only. There is no backend/store,
     // so the ticket is not persisted and won't show up in the list.
-    const id = `TKT-${1000 + Math.floor(Math.random() * 9000)}`;
+    // Timestamp-based id avoids colliding with existing mock ticket ids.
+    const id = `TKT-${Date.now().toString().slice(-6)}`;
     setCreatedId(id);
   };
 

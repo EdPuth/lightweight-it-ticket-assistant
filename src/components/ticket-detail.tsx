@@ -12,6 +12,7 @@ import {
 import { StatusBadge } from "./status-badge";
 import { PriorityBadge } from "./priority-badge";
 import { ActivityTimeline } from "./activity-timeline";
+import { AiSuggestedReply } from "./ai-suggested-reply";
 
 // 工单详情：状态切换与新增备注只更新内存状态（mock，无后端），刷新页面会重置。
 export function TicketDetail({ ticket }: { ticket: Ticket }) {
@@ -56,6 +57,17 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
     setNoteDraft("");
   };
 
+  // Insert an AI-suggested draft into the timeline as a reply activity.
+  const handleInsertReply = (content: string) => {
+    appendActivity({
+      id: nextActivityId(),
+      type: "reply",
+      author: "IT Support",
+      content,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
       <Link
@@ -81,13 +93,13 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
         </div>
       </header>
 
-      <section className="mt-6 grid gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
+      <dl className="mt-6 grid gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
         <DetailField label="Requester" value={ticket.requesterName} />
         <DetailField label="Email" value={ticket.requesterEmail} mono />
         <DetailField label="Assignee" value={ticket.assignedTo ?? "Unassigned"} />
         <DetailField label="Created" value={formatDateTime(ticket.createdAt)} />
         <DetailField label="Last updated" value={formatDateTime(updatedAt)} />
-      </section>
+      </dl>
 
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-muted">Description</h2>
@@ -118,6 +130,8 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           ))}
         </select>
       </section>
+
+      <AiSuggestedReply ticket={ticket} onInsert={handleInsertReply} />
 
       <section className="mt-8">
         <h2 className="mb-4 text-sm font-medium text-muted">Activity</h2>

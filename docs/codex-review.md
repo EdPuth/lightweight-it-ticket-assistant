@@ -164,3 +164,47 @@
 3. Keep submit behavior honest: data is mock/in-memory only and will not survive refresh unless the project later adds storage.
 4. Optionally replace the detail metadata card with a semantic `<dl>` while touching nearby detail markup, but do not turn it into a larger refactor.
 5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.
+
+### Phase 4 — Create Ticket Page + Validation
+- 状态：✅ Reviewed by Codex on 2026-06-17
+
+#### Summary
+- Phase 4 matches `docs/project-brief.md`, `docs/frontend-spec.md`, and `docs/tasks.md`: `/tickets/new` exists, the dashboard's "+ New ticket" path no longer 404s, and the page provides a controlled form with required-field and email validation.
+- The product UI localization to English is recorded in `docs/decisions.md` D7 and is reflected in the dashboard, detail pages, mock ticket copy, labels, metadata, and `<html lang="en">`.
+- Scope remains controlled: no backend, shared store, database, auth, approval flow, or new dependency was added.
+- The mock-submit success state is honest: it generates a display id and clearly says the ticket is not saved and will not appear in the list.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Build output includes static route `/tickets/new` ✅
+- Browser smoke test on `http://localhost:3000` ✅
+  - Dashboard renders English UI and links to `/tickets/new`
+  - `/tickets/new` renders the form with accessible labels
+  - Empty submit shows field-level errors with `aria-invalid` and `aria-describedby`
+  - Editing a field clears that field's error
+  - Invalid email shows "Enter a valid email address."
+  - Valid submit shows "Ticket created" success state with generated `TKT-*` id and mock persistence disclaimer
+  - "Create another" resets the form and errors
+  - "Back to tickets" returns to the Dashboard
+  - Mobile viewport `390x844`: no horizontal overflow observed on the create page
+  - Console errors/warnings: none observed
+
+#### Findings
+- **P3 — Generated mock ids can collide.** The success state uses `TKT-${1000 + Math.floor(Math.random() * 9000)}`. Since the ticket is not persisted, this is not a functional issue, but it can occasionally display an id that already exists in mock data. Consider using a timestamp-based mock id if the duplicate would be confusing in demos.
+- **P3 — Created tickets are intentionally not added to the list.** The success message says this clearly, and `docs/tasks.md` records it as a mock limitation. Make sure README repeats this during Phase 6 so users do not expect persistence.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- The decision to show an in-place success state instead of navigating to a non-persisted detail page is a good MVP tradeoff.
+- Keep Phase 5 limited to mock AI suggested replies inside ticket detail; do not introduce a real LLM API, API route, server action, or key management.
+- If Phase 5 inserts a generated reply into the timeline, reuse the existing local `activities` state pattern from `TicketDetail`.
+
+#### Next Actions For Claude Code
+1. Start Phase 5: add `ai-suggested-reply.tsx` and a local `generateSuggestedReply(ticket)` helper.
+2. Clearly label generated text as "AI suggested draft — review before sending".
+3. Implement idle/loading/generated/copy states and an optional "Insert as reply" action using local timeline state only.
+4. Do not add OpenAI/LLM API code or environment variables for this MVP phase.
+5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.
