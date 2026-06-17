@@ -102,7 +102,6 @@ export default function DashboardPage() {
         <TicketList
           tickets={visibleTickets}
           hasActiveFilters={hasActiveFilters}
-          onClearFilters={handleClear}
         />
       </section>
     </main>

@@ -208,3 +208,43 @@
 3. Implement idle/loading/generated/copy states and an optional "Insert as reply" action using local timeline state only.
 4. Do not add OpenAI/LLM API code or environment variables for this MVP phase.
 5. Run `npm run lint` and `npm run build`, then update `docs/tasks.md`.
+
+### Phase 5 — Mock AI Suggested Reply + Assignee Select
+- 状态：✅ Reviewed by Codex on 2026-06-17
+
+#### Summary
+- Phase 5 matches the MVP intent: AI suggested reply is implemented as a local mock using `src/lib/reply-templates.ts`, with no real LLM/API call, no env vars, no API route, and no new dependency.
+- The UI clearly labels generated text as "Suggested draft — review before sending" and supports idle/loading/generated states.
+- "Insert as reply" reuses the detail page's local `activities` state and appends a `reply` activity without adding a global store.
+- The follow-up assignee enhancement remains lightweight: selectable technicians are centralized in `TECHNICIANS`, and changes append a local timeline note.
+- Phase 4's P3s were addressed: create-ticket mock ids are timestamp-based, and the detail metadata card now uses an explicit `<dl>`.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Source scan found no `fetch`, OpenAI/API code, `process.env`, storage, or new dependency ✅
+- Browser smoke test on `http://localhost:3000` ✅
+  - Detail page renders AI suggested reply section and draft disclaimer
+  - Generate shows a generated editable draft with Copy / Insert as reply / Regenerate controls
+  - Insert as reply appends the draft to the activity timeline and disables the insert button
+  - Assignee select updates metadata and appends an "Assigned to Kyle." timeline note
+  - Mobile viewport `390x844`: no horizontal overflow observed on the detail page
+  - Console errors/warnings: none observed
+
+#### Findings
+- **P2 — Template matching is too broad and can generate misleading replies.** `matchScore()` gives every same-category template +2 and accepts generic keyword hits. In browser testing, TKT-1001 ("Cannot log in to company email") generated `.ost data file is full` steps just because the description mentions Outlook, and TKT-1005 ("Need GitHub organization access") generated mailbox/inbox access steps. This should be tightened before final polish: require stronger/specific keyword matches before selecting a template, remove generic keywords like `access`, or fall back to category-level acknowledgement when confidence is low.
+- **P3 — Copy failure has no visible error state.** In the Browser session, clicking Copy did not show "Copied" and clipboard text remained empty, likely due to clipboard permission/runtime behavior. The component catches failures silently, so users get no feedback if copy fails. Consider adding a small "Copy failed" state or fallback instructions.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- The template-library direction is a reasonable extension point for a future knowledge base or keyword search, but Phase 6 should keep it as documentation/polish rather than building those future features now.
+- Keep all Phase 6 fixes small: match-threshold tweaks, README accuracy, accessibility/responsive review, and final scope cleanup.
+
+#### Next Actions For Claude Code
+1. In Phase 6, fix the template matching false positives before treating the MVP as final.
+2. Add a visible copy failure state or fallback for clipboard errors.
+3. Update README to reflect implemented features and mock limitations: no persistence, created tickets do not appear in list, detail edits reset on refresh, AI replies are local templates.
+4. Re-run full smoke checks across Dashboard, detail, create ticket, AI reply, and mobile.
+5. Do not implement the future knowledge base/search features during Phase 6 unless the owner explicitly expands scope.

@@ -17,12 +17,14 @@ export function AiSuggestedReply({
 }) {
   const [state, setState] = useState<ReplyState>("idle");
   const [draft, setDraft] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   const [inserted, setInserted] = useState(false);
 
   const generate = () => {
     setState("loading");
-    setCopied(false);
+    setCopyState("idle");
     setInserted(false);
     // Simulate a short "thinking" delay so the loading state is visible.
     window.setTimeout(() => {
@@ -34,10 +36,12 @@ export function AiSuggestedReply({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(draft);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 1500);
     } catch {
-      setCopied(false);
+      // Surface the failure so the technician can copy manually instead.
+      setCopyState("failed");
+      window.setTimeout(() => setCopyState("idle"), 2500);
     }
   };
 
@@ -97,7 +101,11 @@ export function AiSuggestedReply({
               onClick={copy}
               className="rounded-xl border border-border bg-surface px-3.5 py-2 text-sm font-medium text-foreground hover:border-ink/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
             >
-              {copied ? "Copied" : "Copy"}
+              {copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed — select & copy manually"
+                  : "Copy"}
             </button>
             <button
               type="button"

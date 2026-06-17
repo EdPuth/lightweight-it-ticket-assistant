@@ -12,7 +12,7 @@
 | Phase 3 | `/tickets/[id]`、timeline、status badge | 点击可进详情；无效 id 友好提示 | ✅ 完成 |
 | Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ✅ 完成 |
 | Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ✅ 完成 |
-| Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ⬜ 待开始 |
+| Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ✅ 完成 |
 
 ---
 
@@ -115,15 +115,27 @@
     不在名单内，如 "IT - Daniel"，自动并入选项以反映真实值）；切换时追加一条 note 活动
     "Assigned to X." / "Unassigned." 并更新 metadata。仅内存。
   - `lint` / `build` 通过；浏览器验证：选项正确、切换更新 metadata + 时间线、无 console 报错。
+- **Codex Review — Phase 5**
+  - 已 review `reply-templates.ts`、`ai-suggested-reply.tsx`、详情页接入、Assignee select 增强。
+  - `npm run lint` 与 `npm run build` 均通过；未发现真实 API / env key / 新依赖。
+  - 浏览器验证通过：生成草稿、Insert as reply 入 timeline、Assignee 切换、移动端无横向溢出、无 console 报错。
+  - `docs/codex-review.md` 已追加 Phase 5 review；未发现高优先级阻塞问题，但有两个 Phase 6 应优先处理的 P2/P3。
+
+- **Phase 6 — Polish, Accessibility, README**
+  - 处理 Codex Phase 5 P2（模板匹配过宽）：`matchScore` 只数**具体关键词**命中（category 不再
+    自动 +2，移除 `.ost`/`access`/`outlook` 等过泛词），`findRelevantTemplates` 要求 ≥1 命中，
+    否则回退 category 级致谢。验证：TKT-1001（登录）、TKT-1005（GitHub）不再误命中。
+  - 新增 3 条精准匹配模板的 mock 工单（TKT-1011 .ost 满 / 1012 Outlook classic 不同步 /
+    1013 申请 shared mailbox delegate access），让模板库可见地工作（共 13 张）。
+  - 处理 Codex Phase 5 P3：复制失败显示 "Copy failed — select & copy manually"。
+  - 处理 Codex Phase 2 P3：去重——移除空状态里的 "Clear filters"，仅保留 filter bar 一处。
+  - 重写 README：implemented 功能 + mock 限制（不持久、刷新重置、AI 为本地模板）。
+  - `npm run lint` / `npm run build` 通过；浏览器全量 smoke（含 mobile 375px 无横向溢出、无 console 报错）。
 
 ## Next（下一步）
-- **Phase 6 — Polish, Accessibility, README**
-  - 响应式 / 键盘焦点 / 对比度复查；统一 loading/error 状态。
-  - 处理遗留 P3：无结果时两个 "Clear filters" 按钮的取舍。
-  - 完成 README：区分 planned / implemented；写清 mock 限制（创建不持久、刷新重置）。
-  - 更新 `docs/tasks.md` 的后续扩展方向（含 Owner 提到的知识库 / 关键词搜索）。
-- **Phase 6 Review Focus**
-  - 响应式 / a11y 基础、README 准确性、范围把控（MVP 没长成企业级系统）。
+- **MVP 六个阶段全部完成。** 对照 `docs/project-brief.md` 的 Definition of Done 已满足。
+- 建议 Codex 做一次最终 review 收尾；之后的功能（知识库 / 关键词搜索 / 真实持久化等）需 Owner
+  明确扩范围后再做，见下方"后续扩展方向"。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -145,6 +157,9 @@
   可顺手调整语义结构。
 - 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
   可按视觉/交互偏好决定是否保留。
+- AI suggested reply 的模板匹配当前偏宽：同 category + 泛关键词会误命中不相关方案。Phase 6 最终交付前
+  应收紧匹配规则，避免 mock draft 看起来像错误建议。
+- Copy 使用 `navigator.clipboard.writeText`，当前失败会被静默吞掉；Phase 6 可加 "Copy failed" 反馈。
 
 ## 后续扩展方向（不在 MVP 内）
 - 加入 Supabase / Firebase 存储真实 tickets。

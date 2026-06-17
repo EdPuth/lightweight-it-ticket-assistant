@@ -6,11 +6,9 @@ import { TicketCard } from "./ticket-card";
 export function TicketList({
   tickets,
   hasActiveFilters,
-  onClearFilters,
 }: {
   tickets: Ticket[];
   hasActiveFilters: boolean;
-  onClearFilters: () => void;
 }) {
   if (tickets.length === 0) {
     return (
@@ -20,18 +18,9 @@ export function TicketList({
         </p>
         <p className="mt-1.5 text-sm text-muted">
           {hasActiveFilters
-            ? "Try adjusting your search or filters."
+            ? "Try adjusting your search, or use Clear filters above."
             : "New tickets will show up here."}
         </p>
-        {hasActiveFilters ? (
-          <button
-            type="button"
-            onClick={onClearFilters}
-            className="mt-5 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
-          >
-            Clear filters
-          </button>
-        ) : null}
       </div>
     );
   }

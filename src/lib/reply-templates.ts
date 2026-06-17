@@ -9,15 +9,17 @@ import type { Ticket, TicketCategory } from "./types";
 //     these same entries as standalone articles.
 //   - A future keyword search over tickets can reuse `matchScore()`.
 //
-// To add a new canned solution, just append a SolutionTemplate below — no
-// component or generator changes required.
+// Keywords must be SPECIFIC. A template is only selected when at least one of
+// its distinctive keywords actually appears in the ticket text — category
+// alone never selects a template, to avoid misleading replies. To add a new
+// canned solution, append a SolutionTemplate below.
 // ---------------------------------------------------------------------------
 
 export type SolutionTemplate = {
   id: string;
   title: string;
   category: TicketCategory;
-  /** Lowercase keywords matched against a ticket's title + description. */
+  /** Specific, lowercase phrases matched against a ticket's title + description. */
   keywords: string[];
   /** The resolution steps / reply body shown to the technician. */
   body: string;
@@ -28,7 +30,7 @@ export const solutionTemplates: SolutionTemplate[] = [
     id: "email-ost-full",
     title: "Outlook .ost data file is full or oversized",
     category: "email",
-    keywords: ["ost", ".ost", "data file", "mailbox full", "storage", "outlook"],
+    keywords: [".ost", "ost file", "data file", "mailbox is full", "mailbox full"],
     body: [
       "1. Close Outlook completely.",
       "2. Check the .ost size under %LOCALAPPDATA%\\Microsoft\\Outlook.",
@@ -42,13 +44,12 @@ export const solutionTemplates: SolutionTemplate[] = [
     title: "Grant a user access to another mailbox / inbox",
     category: "access",
     keywords: [
-      "access",
-      "inbox",
-      "mailbox",
-      "delegate",
-      "shared",
-      "permission",
-      "another employee",
+      "delegate access",
+      "shared mailbox",
+      "inbox access",
+      "mailbox access",
+      "access to a mailbox",
+      "access to another",
     ],
     body: [
       "1. Confirm written approval from the mailbox owner or their manager.",
@@ -63,13 +64,12 @@ export const solutionTemplates: SolutionTemplate[] = [
     title: "Outlook (classic) is not syncing",
     category: "email",
     keywords: [
-      "outlook",
-      "classic",
-      "sync",
       "not syncing",
       "send/receive",
-      "stuck",
-      "offline",
+      "send and receive",
+      "outlook classic",
+      "classic outlook",
+      "working offline",
     ],
     body: [
       "1. Check the status bar — if it shows 'Working Offline', toggle Send/Receive > Work Offline.",
@@ -97,38 +97,29 @@ const CATEGORY_FALLBACK: Record<TicketCategory, string> = {
     "Thanks for reaching out. We've received your request and will follow up shortly.",
 };
 
-const STOP_WORDS = new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "that",
-  "this",
-  "from",
-  "have",
-  "not",
-]);
-
 /**
- * Score how well a template matches a ticket (category + keyword hits).
- * Pure and reusable — a future ticket keyword-search can call this too.
+ * Count how many of a template's specific keywords appear in a ticket's
+ * title + description. Pure and reusable — a future ticket keyword-search
+ * can call this too. Category is deliberately NOT scored here so that a
+ * shared category alone can never select a template.
  */
 export function matchScore(template: SolutionTemplate, ticket: Ticket): number {
   const haystack = `${ticket.title} ${ticket.description}`.toLowerCase();
-  let score = 0;
-  if (template.category === ticket.category) score += 2;
+  let hits = 0;
   for (const keyword of template.keywords) {
-    if (!keyword || STOP_WORDS.has(keyword)) continue;
-    if (haystack.includes(keyword.toLowerCase())) score += 1;
+    if (haystack.includes(keyword.toLowerCase())) hits += 1;
   }
-  return score;
+  return hits;
 }
 
-/** Return templates relevant to a ticket, best match first (score > 0). */
+/**
+ * Return templates that genuinely match a ticket (at least one specific
+ * keyword hit), best match first.
+ */
 export function findRelevantTemplates(ticket: Ticket): SolutionTemplate[] {
   return solutionTemplates
     .map((template) => ({ template, score: matchScore(template, ticket) }))
-    .filter((entry) => entry.score > 0)
+    .filter((entry) => entry.score >= 1)
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.template);
 }

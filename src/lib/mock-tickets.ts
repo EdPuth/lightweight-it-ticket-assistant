@@ -359,4 +359,78 @@ export const mockTickets: Ticket[] = [
       },
     ],
   },
+  {
+    id: 'TKT-1011',
+    title: 'Outlook is slow and mailbox is full',
+    requesterName: 'Karen Brooks',
+    requesterEmail: 'karen.brooks@example.com',
+    category: 'email',
+    priority: 'medium',
+    status: 'in_progress',
+    description:
+      'Outlook has become very slow and shows a warning that the mailbox is full. The .ost data file looks huge and I keep getting "cannot expand the folder" errors.',
+    createdAt: '2026-06-16T04:00:00.000Z',
+    updatedAt: '2026-06-16T04:20:00.000Z',
+    assignedTo: 'Kyle',
+    activities: [
+      {
+        id: 'ACT-1011-1',
+        type: 'created',
+        author: 'Karen Brooks',
+        content: 'Ticket created.',
+        createdAt: '2026-06-16T04:00:00.000Z',
+      },
+      {
+        id: 'ACT-1011-2',
+        type: 'status_changed',
+        author: 'Kyle',
+        content: 'Status changed from Open to In Progress.',
+        createdAt: '2026-06-16T04:20:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'TKT-1012',
+    title: 'Outlook classic not syncing new mail',
+    requesterName: 'Leo Schmidt',
+    requesterEmail: 'leo.schmidt@example.com',
+    category: 'email',
+    priority: 'high',
+    status: 'open',
+    description:
+      'Outlook classic stopped pulling in new mail since this morning. It is not syncing, a manual Send/Receive does nothing, and the status bar shows Working Offline.',
+    createdAt: '2026-06-16T05:10:00.000Z',
+    updatedAt: '2026-06-16T05:10:00.000Z',
+    activities: [
+      {
+        id: 'ACT-1012-1',
+        type: 'created',
+        author: 'Leo Schmidt',
+        content: 'Ticket created.',
+        createdAt: '2026-06-16T05:10:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'TKT-1013',
+    title: 'Request delegate access to shared mailbox',
+    requesterName: 'Mia Torres',
+    requesterEmail: 'mia.torres@example.com',
+    category: 'access',
+    priority: 'medium',
+    status: 'open',
+    description:
+      'I need delegate access to the shared mailbox support@example.com so I can cover tickets while a colleague is on leave.',
+    createdAt: '2026-06-15T11:00:00.000Z',
+    updatedAt: '2026-06-15T11:00:00.000Z',
+    activities: [
+      {
+        id: 'ACT-1013-1',
+        type: 'created',
+        author: 'Mia Torres',
+        content: 'Ticket created.',
+        createdAt: '2026-06-15T11:00:00.000Z',
+      },
+    ],
+  },
 ];
