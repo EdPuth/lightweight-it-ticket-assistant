@@ -39,7 +39,10 @@ export default function RootLayout({
       lang="en"
       className={`${fraunces.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-background text-foreground font-sans"
+      >
         {children}
       </body>
     </html>

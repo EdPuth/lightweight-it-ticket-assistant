@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { mockTickets } from "@/lib/mock-tickets";
-import { getTicketById } from "@/lib/ticket-utils";
+import { getTicketById } from "@/lib/tickets-repo";
 import { TicketDetail } from "@/components/ticket-detail";
 
 // Next.js 16：App Router 的 params 是 Promise，必须 await。
@@ -9,11 +8,14 @@ type TicketPageProps = {
   params: Promise<{ id: string }>;
 };
 
+// Always read fresh data from the database on each request.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: TicketPageProps): Promise<Metadata> {
   const { id } = await params;
-  const ticket = getTicketById(mockTickets, id);
+  const ticket = await getTicketById(id);
   return {
     title: ticket
       ? `${ticket.title} · ${ticket.id}`
@@ -23,7 +25,7 @@ export async function generateMetadata({
 
 export default async function TicketDetailPage({ params }: TicketPageProps) {
   const { id } = await params;
-  const ticket = getTicketById(mockTickets, id);
+  const ticket = await getTicketById(id);
 
   if (!ticket) {
     return <TicketNotFound id={id} />;
