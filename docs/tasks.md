@@ -13,6 +13,10 @@
 | Phase 4 | `/tickets/new` 表单 + 校验 | 字段清楚；校验可用；mock 提交 | ✅ 完成 |
 | Phase 5 | mock AI suggested reply | loading/生成/复制状态；标注 suggested draft | ✅ 完成 |
 | Phase 6 | responsive、a11y、README、review notes | 本地运行正常；docs 记录下一步 | ✅ 完成 |
+| DB Ext 1 | Supabase 脚手架：依赖/schema/seed/env/client/docs | 文件就位；`build` 通过；不破坏现有 mock 运行 | ✅ 完成 |
+| DB Ext 2 | 读迁移：Dashboard/详情读 DB | 列表/详情从 Supabase 读出 | ⬜ 待开始 |
+| DB Ext 3 | 写迁移：Server Actions 落库 | 创建/改状态/备注/指派/插入回复持久化 | ⬜ 待开始 |
+| DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ⬜ 待开始 |
 
 ---
 
@@ -131,35 +135,47 @@
   - 处理 Codex Phase 2 P3：去重——移除空状态里的 "Clear filters"，仅保留 filter bar 一处。
   - 重写 README：implemented 功能 + mock 限制（不持久、刷新重置、AI 为本地模板）。
   - `npm run lint` / `npm run build` 通过；浏览器全量 smoke（含 mobile 375px 无横向溢出、无 console 报错）。
+- **Codex Review — Phase 6**
+  - 已 review Phase 6 polish、README、AI 模板匹配、copy 失败反馈、empty state 去重和最终 MVP 范围。
+  - `npm run lint` 与 `npm run build` 均通过；未发现真实 API / env key / storage / 新依赖。
+  - 浏览器验证通过：Dashboard、筛选无结果、TKT-1001/TKT-1005 fallback、TKT-1011 `.ost` 模板、
+    copy failure feedback、Insert as reply、移动端 Dashboard/detail/create 无横向溢出、无 console 报错。
+  - `docs/codex-review.md` 已追加 Phase 6 review；未发现需要阻塞 MVP 收尾的代码问题。
+
+- **MVP 六个阶段全部完成**（Definition of Done 已满足，Phase 6 最终 review 已过）。
+
+- **Database Extension — Step 1（Supabase 脚手架）**
+  - 加依赖 `@supabase/supabase-js`（决策 D9）。
+  - `supabase/schema.sql`（tickets + activities + check 约束 + RLS 开但无 public policy +
+    TKT-#### 序列）、`supabase/seed.sql`（由 `scripts/gen-seed.ts` 从 13 条 mock 生成：13 工单 + 31 活动）。
+  - `.env.example`、`src/lib/supabase/server.ts`（service-role 懒加载单例，仅服务端）。
+  - `docs/db-setup.md`（建库 + 灌种子 + 本地 + Vercel 的手把手指南）、decisions D9/D10。
+  - 本步只新增文件、不改读写路径 → 现有 mock 应用照常运行；`build` 通过。
 
 ## Next（下一步）
-- **MVP 六个阶段全部完成。** 对照 `docs/project-brief.md` 的 Definition of Done 已满足。
-- 建议 Codex 做一次最终 review 收尾；之后的功能（知识库 / 关键词搜索 / 真实持久化等）需 Owner
-  明确扩范围后再做，见下方"后续扩展方向"。
+- **Owner 操作**：按 `docs/db-setup.md` 建 Supabase 项目、跑 schema+seed SQL、填 `.env.local`，
+  把 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 给 Claude。
+- **DB Ext Step 2 — 读迁移**：`tickets-repo` 读函数；`page.tsx` 改 Server Component 读 DB；`[id]` 用 repo。
+- **Review Focus**：repo 行↔类型映射正确、service key 不外泄、保留并复用 ticket-utils；
+  知识库/关键词搜索仍不在本阶段范围。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
 - Tailwind v4：CSS-first 配置（`@import "tailwindcss"` + `@theme`），无 `tailwind.config.js`。
-- 范围蔓延风险：避免把 MVP 做成企业级 helpdesk（无登录、无真实 API、无数据库）。
-- README 当前描述的是目标 MVP 功能，不是已完成功能；后续阶段需要逐步更新，或在 Phase 6 明确区分
-  planned / implemented。
+- 范围蔓延风险：MVP 已完成；后续不要顺手扩成企业级 helpdesk（无登录、无真实 API、无数据库），除非 Owner 明确开新 scope。
+- README 已在 Phase 6 改为 implemented features + mock limitations；后续如果扩 scope，需要同步维护。
 - ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
 - ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
 - `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），
   新增活动的时间在事件回调里生成（非渲染期），无 hydration 风险。
 - ~~ticket card / "+ New ticket" 链接 404~~：详情页（Phase 3）与创建页（Phase 4）均已实现。
 - 详情页状态切换 / 新增备注、创建页提交均仅内存，刷新后重置（mock 设计预期，UI 已注明）。
-- 创建的工单不会出现在列表/详情里（无共享 store）；这是 mock 限制，成功页已说明。Phase 6 可在
-  README 的 limitations 里写清楚。
-- 创建页 mock id 使用随机数生成，理论上可能和现有 mock ticket id 重复；不影响功能，演示时若介意可改成
-  timestamp-based mock id。
-- 详情页 metadata 字段使用 `dt` / `dd`，但外层当前不是显式 `<dl>`；功能不受影响，后续若改动详情页
-  可顺手调整语义结构。
-- 筛选无结果时页面有两个"清除筛选"按钮（filter bar 与 empty state 各一个）；功能正常，Phase 6
-  可按视觉/交互偏好决定是否保留。
-- AI suggested reply 的模板匹配当前偏宽：同 category + 泛关键词会误命中不相关方案。Phase 6 最终交付前
-  应收紧匹配规则，避免 mock draft 看起来像错误建议。
-- Copy 使用 `navigator.clipboard.writeText`，当前失败会被静默吞掉；Phase 6 可加 "Copy failed" 反馈。
+- 创建的工单不会出现在列表/详情里（无共享 store）；这是 mock 限制，成功页与 README 已说明。
+- ~~创建页 mock id 随机碰撞风险~~：已在 Phase 5 改成 timestamp-based mock id。
+- ~~详情页 metadata 缺少显式 `<dl>`~~：已在 Phase 5 修正。
+- ~~筛选无结果时有两个 "Clear filters" 按钮~~：已在 Phase 6 去重。
+- ~~AI suggested reply 模板匹配过宽~~：已在 Phase 6 改成具体关键词命中，category 不再自动选模板。
+- ~~Copy 失败静默吞掉~~：已在 Phase 6 增加 "Copy failed — select & copy manually" 可见反馈。
 
 ## 后续扩展方向（不在 MVP 内）
 - 加入 Supabase / Firebase 存储真实 tickets。

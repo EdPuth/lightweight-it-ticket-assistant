@@ -248,3 +248,43 @@
 3. Update README to reflect implemented features and mock limitations: no persistence, created tickets do not appear in list, detail edits reset on refresh, AI replies are local templates.
 4. Re-run full smoke checks across Dashboard, detail, create ticket, AI reply, and mobile.
 5. Do not implement the future knowledge base/search features during Phase 6 unless the owner explicitly expands scope.
+
+### Phase 6 — Final MVP Polish
+- 状态：✅ Reviewed by Codex on 2026-06-17
+
+#### Summary
+- Phase 6 resolves the two Phase 5 review concerns: AI template matching no longer picks a solution from category alone, and clipboard failures now show visible feedback.
+- The README now describes implemented features and mock limitations accurately.
+- MVP scope remains controlled: no backend, auth, global store, real AI API, storage, or new dependency was added.
+- The app is ready to stop at MVP unless the owner explicitly opens a new post-MVP scope.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Source scan found no `fetch`, OpenAI/API code, `process.env`, browser storage, `dangerouslySetInnerHTML`, TODO/FIXME, or `any` abuse ✅
+- Browser smoke test on `http://localhost:3000` ✅
+  - Dashboard renders `13 tickets total` and `13 results`
+  - No-results search has one `Clear filters` button, not duplicate actions
+  - TKT-1001 falls back to a generic email acknowledgement and no longer suggests `.ost` steps
+  - TKT-1005 falls back to a generic access acknowledgement and no longer suggests mailbox/delegate steps
+  - TKT-1011 matches the `.ost` template and shows specific local-cache steps
+  - Clipboard failure shows `Copy failed — select & copy manually`
+  - `Insert as reply` appends a new reply activity and changes the button to `Inserted`
+  - Mobile viewport `375x812`: Dashboard, detail, and create-ticket pages have no horizontal overflow
+  - Console errors/warnings: none observed
+
+#### Findings
+- No code changes required before closing the MVP.
+- **P3 — `docs/tasks.md` still listed several resolved risks as active.** README accuracy, random create ids, metadata `<dl>`, duplicate Clear filters, broad AI matching, and silent copy failure were already fixed by Phase 6. I cleaned up the Risks section during this review so the handoff docs now match the code.
+
+#### High-Priority Issues
+- None.
+
+#### Scope / Architecture Notes
+- The local template library is still a mock AI substitute, which is correct for this project brief.
+- Future features such as persistence, auth, real AI, knowledge base pages, and cross-ticket search should be treated as a new scope decision rather than a Phase 6 follow-up.
+
+#### Next Actions For Claude Code
+1. No required Phase 6 code fixes.
+2. If the owner wants to continue, open a new post-MVP phase and choose exactly one next feature, such as persistence or keyword search.
+3. Keep README and `docs/tasks.md` updated if the project scope expands.

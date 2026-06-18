@@ -77,3 +77,25 @@
     `ticket-utils.ts` 的 `searchTickets` 让它也匹配 `description`（当前仅 id/title/requester/email）。
   - 真实 LLM：把 `generateSuggestedReply` 内部换成 API 调用即可，签名 `(ticket) => string` 不变
     （改 async）；组件状态机（idle/loading/generated）已适配异步。
+
+## D9 — 引入依赖 `@supabase/supabase-js`（Database Extension 阶段）
+- **背景**：Owner 要把工单从内存 mock 迁到真实数据库做持久化存储与检索。
+- **决定**：选 **Supabase（托管 PostgreSQL）**，引入官方客户端 `@supabase/supabase-js`。
+- **替代方案**：
+  - Firebase（Firestore，NoSQL）——数据是关系型（ticket 一对多 activity），文档型查询/搜索更别扭。
+  - Prisma + 自管 Postgres——更重，要自己搭/运维数据库，不适合轻量练习。
+  - 直接用 `pg` 驱动写 SQL——可行但要手写连接/查询封装；Supabase 客户端 + 托管库更省事。
+- **理由**：关系型契合现有类型、SQL 检索自然、托管免运维、与 Next.js/Vercel 集成好、免费额度够练习。
+- **影响**：新增一个运行时依赖；需要 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 两个环境变量。
+
+## D10 — 数据库架构：service-role server-only + repo + Server Actions
+- **背景**：在 Next.js 16 App Router 下安全地读写 Supabase。
+- **决定**：
+  - 所有 DB 访问走**服务端**：Server Components 读、Server Actions 写。
+  - 用 **service_role** 密钥（`src/lib/supabase/server.ts` 懒加载单例），**仅服务端**、不加 `NEXT_PUBLIC_`。
+  - 数据访问集中在 `src/lib/tickets-repo.ts`（行 snake_case ↔ 类型 camelCase 映射）；
+    `Ticket`/`TicketActivity` 类型与展示/筛选纯函数（`ticket-utils.ts`）保持不变、继续复用。
+  - 开启 RLS 但不加 public policy → service_role 绕过、anon 无法访问。
+- **理由**：服务端持密钥最简单安全；repo 层让组件改动最小、易 review；类型不变保护既有代码。
+- **影响 / 注意**：现阶段**无登录**，任何访问者可读写（practice/演示用）。生产化需 Supabase Auth +
+  RLS policies + anon key，列入后续方向。`mock-tickets.ts` 保留为种子来源（`scripts/gen-seed.ts`）。
