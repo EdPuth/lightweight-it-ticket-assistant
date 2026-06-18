@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
-import type { Ticket, TicketActivity, TicketStatus } from "@/lib/types";
+import type { Ticket, TicketStatus } from "@/lib/types";
 import {
   CATEGORY_LABELS,
   formatDateTime,
@@ -10,84 +10,70 @@ import {
   STATUS_ORDER,
   TECHNICIANS,
 } from "@/lib/ticket-utils";
+import {
+  addNoteAction,
+  assignAction,
+  changeStatusAction,
+  insertReplyAction,
+} from "@/app/actions";
 import { StatusBadge } from "./status-badge";
 import { PriorityBadge } from "./priority-badge";
 import { ActivityTimeline } from "./activity-timeline";
 import { AiSuggestedReply } from "./ai-suggested-reply";
 
-// 工单详情：状态切换与新增备注只更新内存状态（mock，无后端），刷新页面会重置。
+// 工单详情：状态切换 / 指派 / 备注 / 插入回复都通过 Server Actions 落库（持久化）。
+// DB 为唯一真相：操作后 revalidatePath 用最新数据重渲染本组件（props 更新）。
+// 状态/指派的 select 用 useOptimistic 即时反映选择，事务完成后自动对齐回 DB 真值。
 export function TicketDetail({ ticket }: { ticket: Ticket }) {
-  const [status, setStatus] = useState<TicketStatus>(ticket.status);
-  const [activities, setActivities] = useState<TicketActivity[]>(
-    ticket.activities,
-  );
-  const [updatedAt, setUpdatedAt] = useState(ticket.updatedAt);
-  const [assignee, setAssignee] = useState(ticket.assignedTo ?? "");
+  const [isPending, startTransition] = useTransition();
   const [noteDraft, setNoteDraft] = useState("");
+
+  // Optimistic values reflect the user's choice immediately and automatically
+  // reconcile back to the authoritative database value once the action's
+  // revalidation delivers fresh props.
+  const [optimisticStatus, setOptimisticStatus] = useOptimistic(ticket.status);
+  const [optimisticAssignee, setOptimisticAssignee] = useOptimistic(
+    ticket.assignedTo ?? "",
+  );
 
   // Build the assignee options: Unassigned + known technicians, plus the
   // ticket's current assignee if it isn't already in the list (e.g. seeded
-  // mock data like "IT - Daniel"), so the select always reflects reality.
+  // data like "IT - Daniel"), so the select always reflects reality.
   const assigneeOptions = [
     ...TECHNICIANS,
-    ...(assignee && !TECHNICIANS.includes(assignee) ? [assignee] : []),
+    ...(optimisticAssignee && !TECHNICIANS.includes(optimisticAssignee)
+      ? [optimisticAssignee]
+      : []),
   ];
 
-  // 为新增的本地活动生成唯一 id（仅内存使用）。
-  const localSeq = useRef(0);
-  const nextActivityId = () => `LOCAL-${(localSeq.current += 1)}`;
-
-  const appendActivity = (activity: TicketActivity) => {
-    setActivities((prev) => [...prev, activity]);
-    setUpdatedAt(activity.createdAt);
-  };
-
   const handleStatusChange = (next: TicketStatus) => {
-    if (next === status) return;
-    appendActivity({
-      id: nextActivityId(),
-      type: "status_changed",
-      author: "IT Support",
-      content: `Status changed from ${STATUS_LABELS[status]} to ${STATUS_LABELS[next]}.`,
-      createdAt: new Date().toISOString(),
+    if (next === optimisticStatus) return;
+    const prev = ticket.status;
+    startTransition(() => {
+      setOptimisticStatus(next);
+      return changeStatusAction(ticket.id, prev, next);
     });
-    setStatus(next);
   };
 
   const handleAddNote = () => {
     const content = noteDraft.trim();
     if (!content) return;
-    appendActivity({
-      id: nextActivityId(),
-      type: "note",
-      author: "IT Support",
-      content,
-      createdAt: new Date().toISOString(),
-    });
     setNoteDraft("");
+    startTransition(() => addNoteAction(ticket.id, content));
   };
 
   const handleAssigneeChange = (next: string) => {
-    if (next === assignee) return;
-    appendActivity({
-      id: nextActivityId(),
-      type: "note",
-      author: "IT Support",
-      content: next ? `Assigned to ${next}.` : "Unassigned.",
-      createdAt: new Date().toISOString(),
+    if (next === optimisticAssignee) return;
+    const prev = ticket.assignedTo ?? "";
+    startTransition(() => {
+      setOptimisticAssignee(next);
+      return assignAction(ticket.id, prev, next);
     });
-    setAssignee(next);
   };
 
   // Insert an AI-suggested draft into the timeline as a reply activity.
   const handleInsertReply = (content: string) => {
-    appendActivity({
-      id: nextActivityId(),
-      type: "reply",
-      author: "IT Support",
-      content,
-      createdAt: new Date().toISOString(),
-    });
+    startTransition(() => insertReplyAction(ticket.id, content));
   };
 
   return (
@@ -107,7 +93,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           {ticket.title}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <StatusBadge status={status} />
+          <StatusBadge status={optimisticStatus} />
           <PriorityBadge priority={ticket.priority} />
           <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-foreground/80">
             {CATEGORY_LABELS[ticket.category]}
@@ -118,9 +104,12 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       <dl className="mt-6 grid gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
         <DetailField label="Requester" value={ticket.requesterName} />
         <DetailField label="Email" value={ticket.requesterEmail} mono />
-        <DetailField label="Assignee" value={assignee || "Unassigned"} />
+        <DetailField label="Assignee" value={optimisticAssignee || "Unassigned"} />
         <DetailField label="Created" value={formatDateTime(ticket.createdAt)} />
-        <DetailField label="Last updated" value={formatDateTime(updatedAt)} />
+        <DetailField
+          label="Last updated"
+          value={formatDateTime(ticket.updatedAt)}
+        />
       </dl>
 
       <section className="mt-6">
@@ -140,11 +129,12 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           </label>
           <select
             id="status-select"
-            value={status}
+            value={optimisticStatus}
+            disabled={isPending}
             onChange={(event) =>
               handleStatusChange(event.target.value as TicketStatus)
             }
-            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50"
           >
             {STATUS_ORDER.map((value) => (
               <option key={value} value={value}>
@@ -163,9 +153,10 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           </label>
           <select
             id="assignee-select"
-            value={assignee}
+            value={optimisticAssignee}
+            disabled={isPending}
             onChange={(event) => handleAssigneeChange(event.target.value)}
-            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            className="rounded-xl border border-border bg-surface py-2 pl-3 pr-8 text-sm text-foreground focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50"
           >
             <option value="">Unassigned</option>
             {assigneeOptions.map((name) => (
@@ -180,8 +171,15 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
       <AiSuggestedReply ticket={ticket} onInsert={handleInsertReply} />
 
       <section className="mt-8">
-        <h2 className="mb-4 text-sm font-medium text-muted">Activity</h2>
-        <ActivityTimeline activities={activities} />
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted">Activity</h2>
+          {isPending ? (
+            <span className="text-xs text-faint" aria-live="polite">
+              Saving…
+            </span>
+          ) : null}
+        </div>
+        <ActivityTimeline activities={ticket.activities} />
 
         <div className="mt-5">
           <label htmlFor="note-input" className="sr-only">
@@ -192,14 +190,14 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
             value={noteDraft}
             onChange={(event) => setNoteDraft(event.target.value)}
             rows={3}
-            placeholder="Add an internal note… (in-memory only, resets on refresh)"
+            placeholder="Add an internal note…"
             className="w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
           />
           <div className="mt-2 flex justify-end">
             <button
               type="button"
               onClick={handleAddNote}
-              disabled={!noteDraft.trim()}
+              disabled={!noteDraft.trim() || isPending}
               className="ticket-card rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               Add note

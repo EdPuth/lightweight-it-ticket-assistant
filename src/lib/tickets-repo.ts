@@ -110,3 +110,76 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
 
   return mapTicket(ticket as TicketRow, (activities ?? []) as ActivityRow[]);
 }
+
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
+
+export type NewTicketInput = {
+  title: string;
+  requesterName: string;
+  requesterEmail: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  description: string;
+  assignedTo?: string | null;
+};
+
+/** Insert a ticket; the DB generates the TKT-#### id. Returns the new id. */
+export async function insertTicket(input: NewTicketInput): Promise<string> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("tickets")
+    .insert({
+      title: input.title,
+      requester_name: input.requesterName,
+      requester_email: input.requesterEmail,
+      category: input.category,
+      priority: input.priority,
+      status: input.status,
+      description: input.description,
+      assigned_to: input.assignedTo ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(`Failed to create ticket: ${error.message}`);
+  return (data as { id: string }).id;
+}
+
+/** Insert an activity and bump the ticket's updated_at. */
+export async function insertActivity(
+  ticketId: string,
+  activity: { type: TicketActivityType; author: string; content: string },
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("activities").insert({
+    ticket_id: ticketId,
+    type: activity.type,
+    author: activity.author,
+    content: activity.content,
+  });
+  if (error) throw new Error(`Failed to add activity: ${error.message}`);
+
+  await sb
+    .from("tickets")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", ticketId);
+}
+
+/** Update mutable ticket fields and bump updated_at. */
+export async function updateTicketFields(
+  ticketId: string,
+  fields: { status?: TicketStatus; assignedTo?: string | null },
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (fields.status !== undefined) patch.status = fields.status;
+  if (fields.assignedTo !== undefined) patch.assigned_to = fields.assignedTo;
+
+  const { error } = await sb.from("tickets").update(patch).eq("id", ticketId);
+  if (error) throw new Error(`Failed to update ticket: ${error.message}`);
+}

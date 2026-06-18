@@ -21,15 +21,18 @@ two-agent development workflow.
   solution-template library (no real LLM). Copy it or insert it into the timeline as a
   reply. Clearly labelled "Suggested draft — review before sending".
 
-## Mock limitations (by design)
+## Data & persistence
 
-This MVP has **no persistence**. Specifically:
+Tickets are stored in a **Supabase (PostgreSQL)** database (see `docs/db-setup.md`). Creating a
+ticket, changing status, assigning a technician, adding notes, and inserting an AI reply are all
+**persisted** and survive a page refresh. Reads happen in Server Components; writes go through
+Server Actions using a server-only service-role key.
 
-- Submitting the create form does **not** save the ticket — it shows a success state but the
-  ticket does **not** appear in the list.
-- Changing status, assigning a technician, adding notes, or inserting an AI reply update
-  **in-memory state only** and **reset on page refresh**.
-- AI replies are generated from **local templates**, not a real language model.
+Still mock / out of scope:
+
+- **No auth** — anyone who can open the app can read/write (practice/demo only).
+- **AI replies** are generated from **local templates** (`src/lib/reply-templates.ts`), not a
+  real language model.
 
 ## Tech stack
 

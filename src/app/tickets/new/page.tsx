@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { TicketCategory, TicketPriority } from "@/lib/types";
 import {
@@ -9,6 +9,7 @@ import {
   PRIORITY_LABELS,
   PRIORITY_ORDER,
 } from "@/lib/ticket-utils";
+import { createTicketAction } from "@/app/actions";
 
 // Shape of the form (category starts empty to force an explicit choice).
 type FormState = {
@@ -50,7 +51,7 @@ function validate(form: FormState): FormErrors {
 export default function NewTicketPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -65,51 +66,18 @@ export default function NewTicketPage() {
       setErrors(nextErrors);
       return;
     }
-    // Mock "create": generate a display id only. There is no backend/store,
-    // so the ticket is not persisted and won't show up in the list.
-    // Timestamp-based id avoids colliding with existing mock ticket ids.
-    const id = `TKT-${Date.now().toString().slice(-6)}`;
-    setCreatedId(id);
-  };
-
-  const resetForm = () => {
-    setForm(EMPTY_FORM);
-    setErrors({});
-    setCreatedId(null);
-  };
-
-  if (createdId) {
-    return (
-      <main className="mx-auto w-full max-w-2xl px-5 py-12 sm:py-16">
-        <div className="rounded-xl border border-border bg-surface px-6 py-12 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <p className="font-serif text-2xl text-foreground">Ticket created</p>
-          <p className="mt-2 text-sm text-muted">
-            <span className="font-mono text-foreground/80">{createdId}</span> ·{" "}
-            {form.title}
-          </p>
-          <p className="mx-auto mt-3 max-w-sm text-xs text-faint">
-            This is a mock submission for the practice project — it is not saved,
-            so it will not appear in the ticket list.
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="ticket-card rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-ink/20 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
-            >
-              Create another
-            </button>
-            <Link
-              href="/"
-              className="ticket-card rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
-            >
-              Back to dashboard
-            </Link>
-          </div>
-        </div>
-      </main>
+    // Persist to the database, then the action redirects to the new ticket.
+    startTransition(() =>
+      createTicketAction({
+        requesterName: form.requesterName.trim(),
+        requesterEmail: form.requesterEmail.trim(),
+        title: form.title.trim(),
+        category: form.category as TicketCategory,
+        priority: form.priority,
+        description: form.description.trim(),
+      }),
     );
-  }
+  };
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-12 sm:py-16">
@@ -228,9 +196,10 @@ export default function NewTicketPage() {
           </Link>
           <button
             type="submit"
-            className="ticket-card rounded-xl bg-ink px-5 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
+            disabled={isPending}
+            className="ticket-card rounded-xl bg-ink px-5 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Create ticket
+            {isPending ? "Creating…" : "Create ticket"}
           </button>
         </div>
       </form>
