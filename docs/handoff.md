@@ -93,7 +93,8 @@
 - ✅ 本地 `npm run dev` 与线上 Vercel **都连同一个 Supabase 库**，读写持久化。
 - ✅ `npm run lint` / `npm run build` 通过；MVP 六阶段 + 英文化 + DB 接入 + 部署全部完成。
 - 数据库现有约 14 条工单（13 条种子 + Owner 在线上测试创建的 `TKT-1015 "asd"`，可删）。
-- Codex 已 review 到 Phase 6；DB 阶段（commit `016ce45..a0e11fb`）**建议再做一次最终 review**。
+- **Codex 已 review 全部阶段，含 Database Extension（2026-06-20）**：无阻塞练习项目的问题，但提出了
+  安全 / 校验类待办 —— 见第 9 节（也是接手后建议先处理的）。
 
 ## 7. 代码地图（去哪找）
 
@@ -118,12 +119,39 @@
 4. 提交前门槛：`npm run lint` 和 `npm run build` 必须过。
 5. 调试连库可用 `node --env-file=.env.local scripts/db-check.ts`。
 
-## 9. 已知限制 & 后续方向（需 Owner 开新 scope 才做）
+## 9. Codex DB-阶段 review 结论 + 下一步（2026-06-20）
 
-- **无登录**：线上公开可读写——只适合 demo。生产化第一步 = **Supabase Auth + RLS policies + anon key**。
-- **关键词搜索历史工单**（Owner 想要）：复用 `reply-templates.ts` 的 `matchScore`；并让
+Codex 已 review 整个 Database Extension：架构清晰、service-role 仅服务端、schema/RLS 基础到位，
+**无阻塞练习项目的问题**。但上线后重点从"组件结构"转向"安全与范围"。原文见
+`docs/codex-review.md` 最后一节「Database Extension — Supabase + Vercel」。
+
+### 9a. 待修问题（按优先级，接手后建议先做前两条）
+
+- **[P2 安全] 公开无登录 + 持久化写入**：任何能打开 Vercel URL 的人都能创建/改状态/指派/加备注。
+  **务必不要放真实数据。** 若长期公开，下一个真实 scope = Supabase Auth + RLS policies + anon key。
+- **[P2] Server Actions 缺服务端校验**：`src/app/actions.ts` 在运行时是公开 endpoint，目前只靠
+  客户端校验和 TS 类型。直接调用可绕过校验、传超长字符串、或传错误的 `prev` 值让活动文案不准。
+  **需补 runtime validation**（create / status / assignee / note / reply）——尽量复用现有联合常量、
+  保持无依赖；如要用 Zod 等小库须先经 Owner 同意。
+- **[P3] `insertActivity()` 未检查 `updated_at` 更新错误**：`src/lib/tickets-repo.ts` 里 activity
+  插入检查了 `error`，但随后的 `tickets.update({ updated_at })` 没看 `{ error }`——失败会让排序/新鲜度
+  时间静默过期。应检查并抛错。
+- **[P3] Dashboard 把完整 ticket 下发到 client**：`listTickets()` 含 description / email / activities
+  全量传给 `DashboardClient`。公开 demo 可接受；若以后接真实/私有数据，应为列表行做轻量 list DTO。
+- **[已修] README 旧措辞**：Codex 本轮已把 README 更新为 Supabase persistence + Vercel 部署。
+
+### 9b. Codex 给的 Next Actions（短期，可直接做）
+
+1. 给所有 Server Actions 加 runtime validation（复用现有联合常量/label，保持无依赖，除非 Owner 同意小库）。
+2. `insertActivity()` 里检查并在 `updated_at` 更新出错时抛错。
+3. 若要往"接近生产"走，**先单独排一个 Auth/RLS 阶段**，再做关键词搜索或真实 AI。
+
+### 9c. 后续功能方向（需 Owner 开新 scope）
+
+- **Auth/RLS 阶段**（建议优先于下面两项）：Supabase Auth + RLS policies + anon key，把无登录公开写入收口。
+- **关键词搜索历史工单**（Owner 想要）：复用 `reply-templates.ts` 的 `matchScore`；让
   `ticket-utils.ts` 的 `searchTickets` 也匹配 `description`（当前只搜 id/title/requester/email）。
-- **邮箱问题知识库**（Owner 想要）：`solutionTemplates` 已是数据种子，渲染成文章页即可。详见决策 D8。
+- **邮箱问题知识库**（Owner 想要）：`solutionTemplates` 已是数据种子，渲染成文章页即可（决策 D8）。
 - AI 回复仍是本地模板；接真实 LLM 只需替换 `generateSuggestedReply` 内部（签名/状态机已适配异步）。
 
 ## 10. docs 索引
