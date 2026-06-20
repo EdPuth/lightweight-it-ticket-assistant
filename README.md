@@ -36,20 +36,30 @@ Still mock / out of scope:
 
 ## Tech stack
 
-- Next.js 16 (App Router) + TypeScript
+- Next.js 16 (App Router, Server Components + Server Actions) + TypeScript
 - React 19
 - Tailwind CSS v4 + custom components (no UI library)
-- React `useState` / `useMemo` for state
-- Mock data in `src/lib/mock-tickets.ts`
+- Supabase (PostgreSQL) for storage; `src/lib/mock-tickets.ts` is the seed source
+- Client filtering/search with `useState` / `useMemo`
 
 ## Run locally
 
+Requires a Supabase project and a `.env.local` — see `docs/db-setup.md`.
+
 ```bash
 npm install      # first time (already installed by the scaffold)
+cp .env.example .env.local   # then fill in SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
 npm run dev      # http://localhost:3000
 npm run lint     # lint check
 npm run build    # production build (the gate before each commit)
 ```
+
+## Deployment
+
+Deployed on Vercel (imports this GitHub repo). Set `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` as Vercel environment variables (no `NEXT_PUBLIC_`
+prefix). See `docs/db-setup.md`. Note: there is **no auth**, so a public
+deployment is readable/writable by anyone — fine for a demo, not for real data.
 
 ## Project structure
 

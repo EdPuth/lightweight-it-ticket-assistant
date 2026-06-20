@@ -16,7 +16,7 @@
 | DB Ext 1 | Supabase 脚手架：依赖/schema/seed/env/client/docs | 文件就位；`build` 通过；不破坏现有 mock 运行 | ✅ 完成 |
 | DB Ext 2 | 读迁移：Dashboard/详情读 DB | 列表/详情从 Supabase 读出 | ✅ 完成 |
 | DB Ext 3 | 写迁移：Server Actions 落库 | 创建/改状态/备注/指派/插入回复持久化 | ✅ 完成 |
-| DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ⬜ 待开始 |
+| DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ✅ 完成 |
 
 ---
 
@@ -152,12 +152,20 @@
   - `docs/db-setup.md`（建库 + 灌种子 + 本地 + Vercel 的手把手指南）、decisions D9/D10。
   - 本步只新增文件、不改读写路径 → 现有 mock 应用照常运行；`build` 通过。
 
+- **DB Ext Step 2 — 读迁移**：`tickets-repo` 读函数；`page.tsx` 改 Server Component 读 DB；
+  `dashboard-client.tsx` 承接筛选/搜索；`[id]` 用 repo；两页 force-dynamic。已用真实库验证。
+- **DB Ext Step 3 — 写迁移**：`actions.ts` 五个 Server Actions（create/changeStatus/assign/
+  addNote/insertReply）+ repo 写函数；详情页 `useTransition`/`useOptimistic`；创建表单落库 + redirect。
+  真实库验证：建 TKT-1014、改状态整页刷新后仍在、Dashboard 计数变化，清理回 13。
+- **DB Ext Step 4 — Vercel 部署 + 收尾**：导入仓库 + 配 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`
+  环境变量；线上 https://lightweight-it-ticket-assistant.vercel.app 验证读写均通（线上创建了 TKT-1015，
+  与本地连同一个库）。README 改为真实 Supabase 数据模型。
+
 ## Next（下一步）
-- **Owner 操作**：按 `docs/db-setup.md` 建 Supabase 项目、跑 schema+seed SQL、填 `.env.local`，
-  把 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 给 Claude。
-- **DB Ext Step 2 — 读迁移**：`tickets-repo` 读函数；`page.tsx` 改 Server Component 读 DB；`[id]` 用 repo。
-- **Review Focus**：repo 行↔类型映射正确、service key 不外泄、保留并复用 ticket-utils；
-  知识库/关键词搜索仍不在本阶段范围。
+- **Database Extension 全部完成**：本地 + 线上都连同一个 Supabase 库，读写持久化。
+- 建议 Codex 做一次 DB 阶段最终 review（schema/repo/actions/安全模型/README 准确性）。
+- 真正"生产化"的下一步（需 Owner 开新 scope）：**Supabase Auth + RLS policies + anon key**——
+  现在线上是公开无登录，任何人可读写。之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
