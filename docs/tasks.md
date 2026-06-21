@@ -160,25 +160,65 @@
 - **DB Ext Step 4 — Vercel 部署 + 收尾**：导入仓库 + 配 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`
   环境变量；线上 https://lightweight-it-ticket-assistant.vercel.app 验证读写均通（线上创建了 TKT-1015，
   与本地连同一个库）。README 改为真实 Supabase 数据模型。
+- **Codex Review — Database Extension**
+  - 已 review Supabase schema、server-only client、`tickets-repo`、Server Actions、Vercel/env docs 与 README。
+  - `npm run lint` 通过；`npm run build` 在允许 `next/font` 联网后通过。
+  - 只读本地 smoke 通过：Dashboard、`/tickets/TKT-1001`、`/tickets/new` 均返回 200 并读取 Supabase 数据。
+  - `docs/codex-review.md` 已追加 DB Extension review；README 已修正旧的 mock-only 文案。
+
+- **Hardening — Server Actions runtime validation + insertActivity 错误检查**（处理 Codex DB review 的 [P2]/[P3]，决策 D11）
+  - 新增 `src/lib/validation.ts`（**无新依赖**）：复用 `ticket-utils.ts` 的 `STATUS_ORDER` /
+    `PRIORITY_ORDER` / `CATEGORY_ORDER` 做枚举校验；`validateCreateTicketInput` / `validateStatus` /
+    `validateAssignee` / `validateNoteContent` / `validateTicketId` 统一 trim + 非空 + 长度上限
+    （`LIMITS`），非法输入抛 `ValidationError`；邮箱做格式校验并小写化。
+  - `src/app/actions.ts` 五个 Server Action（create / changeStatus / assign / addNote / insertReply）
+    入口先校验再落库；空/无变化的提前返回逻辑保留，正常 UX 不变（客户端 button disabled 守卫仍在），
+    只拦截绕过客户端的滥用路径（超长字符串、非法 enum、错误 `prev`）。
+  - `src/lib/tickets-repo.ts` 的 `insertActivity()` 现在检查 `updated_at` 更新的 `{ error }` 并抛错，
+    避免活动已写入但列表排序 / 新鲜度时间静默过期。
+  - `npm run lint` / `npm run build` 通过。纯服务端加固，不改数据模型 / UI / 现有正常流程。
+
+- **Auth Gate — 全站登录门禁（单账号，Owner 要求，决策 D12）**
+  - `src/lib/auth.ts`：单账号凭据（`itsupport@outlook.com` / `123456`）+ session 常量 +
+    `verifyCredentials` / `isValidSession`；仅服务端读，可用 `AUTH_EMAIL` / `AUTH_PASSWORD` /
+    `AUTH_SESSION_TOKEN` env 覆盖。
+  - `src/app/login/actions.ts`：`loginAction`（校验 → 设 httpOnly cookie → redirect `/`）+
+    `logoutAction`（清 cookie → redirect `/login`）。
+  - `src/proxy.ts`：**Next.js 16 的 middleware 改名 proxy**；未登录访问非 `/login` → 跳 `/login`，
+    已登录访问 `/login` → 跳 `/`。
+  - 登录页 `src/app/login/page.tsx` + `src/components/login-form.tsx`（`useActionState`，
+    用 `/frontend-design` 设计）：沿用 Typora 风格 + 状态四圆点脉冲 / 双 aura 漂移 / 点阵网格特效
+    （`globals.css`，遵循 `prefers-reduced-motion`）。Dashboard 顶部加 Sign out
+    （`src/components/logout-button.tsx`）。
+  - `npm run lint` / `npm run build` 通过；浏览器验证全流程：未登录 `/`→`/login`、错误凭据报错、
+    正确凭据 → Dashboard、Sign out → 重新被门禁拦截，无 console 报错。无新依赖。
 
 ## Next（下一步）
 - **Database Extension 全部完成**：本地 + 线上都连同一个 Supabase 库，读写持久化。
-- 建议 Codex 做一次 DB 阶段最终 review（schema/repo/actions/安全模型/README 准确性）。
-- 真正"生产化"的下一步（需 Owner 开新 scope）：**Supabase Auth + RLS policies + anon key**——
-  现在线上是公开无登录，任何人可读写。之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
+- DB 阶段 Codex review 已完成；练习项目可以继续使用，但不要放真实数据。
+- 已加**全站登录门禁**（单账号，决策 D12）：应用层收口了"公开无登录写入"，但仍非 per-user auth / RLS。
+- 真正"生产化"的下一步（需 Owner 开新 scope）：**Supabase Auth + RLS policies + anon key**（替换单账号门禁）。
+- ~~短期修补：Server Actions runtime validation + `insertActivity()` 检查 `updated_at` 更新错误~~：
+  已完成（见 Completed 的 Hardening 条目 + 决策 D11）。**部署前需把改动 push 到 Vercel 才会生效。**
+- Dashboard 仍把完整 ticket 下发到 client（Codex DB review [P3]）：公开 demo 可接受；接真实/私有数据前再做轻量 list DTO。
+- 现在线上是公开无登录，任何人可读写。之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
 - Tailwind v4：CSS-first 配置（`@import "tailwindcss"` + `@theme`），无 `tailwind.config.js`。
-- 范围蔓延风险：MVP 已完成；后续不要顺手扩成企业级 helpdesk（无登录、无真实 API、无数据库），除非 Owner 明确开新 scope。
-- README 已在 Phase 6 改为 implemented features + mock limitations；后续如果扩 scope，需要同步维护。
+- 范围蔓延风险：MVP + DB extension 已完成；后续不要顺手扩成企业级 helpdesk，除非 Owner 明确开新 scope。
+- README 已在 DB review 中更新为 Supabase persistence + Vercel deployment；后续如果扩 scope，需要同步维护。
+- ~~公开无登录 + 持久化写入~~：已加全站登录门禁（单账号，D12），应用层收口。**但仍是单账号共享凭据 + service-role 写**，不是 per-user auth / RLS；真实数据仍必须先做 Supabase Auth + RLS。
+- ~~Server Actions 是公开 endpoint：依赖客户端校验和 TS 类型，仍需补 runtime validation / 长度限制 / transition 校验~~：已在 Hardening 阶段补齐（`src/lib/validation.ts`，决策 D11）。
+- ~~`insertActivity()` 没有检查后续 `tickets.updated_at` 更新错误~~：已在 Hardening 阶段加上 `{ error }` 检查并抛错。
+- Dashboard 当前把完整 ticket（email/description/activities）传给 client。公开 demo 可接受；若以后有真实/私有数据，应改成轻量 list DTO。
 - ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
 - ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
 - `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），
   新增活动的时间在事件回调里生成（非渲染期），无 hydration 风险。
 - ~~ticket card / "+ New ticket" 链接 404~~：详情页（Phase 3）与创建页（Phase 4）均已实现。
-- 详情页状态切换 / 新增备注、创建页提交均仅内存，刷新后重置（mock 设计预期，UI 已注明）。
-- 创建的工单不会出现在列表/详情里（无共享 store）；这是 mock 限制，成功页与 README 已说明。
+- ~~详情页状态切换 / 新增备注、创建页提交仅内存~~：DB Ext Step 3 已改为 Supabase 持久化。
+- ~~创建的工单不会出现在列表/详情里~~：DB Ext Step 3 已改为创建后落库并 redirect 到详情。
 - ~~创建页 mock id 随机碰撞风险~~：已在 Phase 5 改成 timestamp-based mock id。
 - ~~详情页 metadata 缺少显式 `<dl>`~~：已在 Phase 5 修正。
 - ~~筛选无结果时有两个 "Clear filters" 按钮~~：已在 Phase 6 去重。
@@ -186,10 +226,10 @@
 - ~~Copy 失败静默吞掉~~：已在 Phase 6 增加 "Copy failed — select & copy manually" 可见反馈。
 
 ## 后续扩展方向（不在 MVP 内）
-- 加入 Supabase / Firebase 存储真实 tickets。
-- 登录与角色权限：employee / IT support / admin。
+- ~~加入 Supabase 存储真实 tickets~~：DB Extension 已完成。
+- 登录与角色权限：employee / IT support / admin（建议作为下一个生产化 scope）。
 - 接入真实 AI API 生成回复、分类和优先级建议。
-- 部署到 Vercel。
+- ~~部署到 Vercel~~：DB Ext Step 4 已完成。
 - **（Owner 提出）关键词搜索以往 ticket**：technician 用 Outlook / email 等关键词找到历史相关工单。
   扩展点已就绪：复用 `reply-templates.ts` 的 `matchScore`，并让 `searchTickets` 也匹配 `description`。
 - **（Owner 提出）邮箱问题知识库**：把常见解决方案做成文档（.ost 过满、申请他人 inbox 访问、

@@ -12,6 +12,7 @@ import type { PriorityFilter, StatusFilter, Ticket, TicketStatus } from "@/lib/t
 import { StatCard } from "@/components/stat-card";
 import { TicketFilters } from "@/components/ticket-filters";
 import { TicketList } from "@/components/ticket-list";
+import { LogoutButton } from "@/components/logout-button";
 
 // Client dashboard: filtering/search/sort over the tickets fetched on the
 // server and passed in as a prop. No data fetching here.
@@ -42,6 +43,14 @@ export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-5 py-12 sm:py-16">
+      <div className="mb-6 flex items-center justify-between text-xs text-faint">
+        <span>
+          Signed in as{" "}
+          <span className="font-mono text-muted">itsupport@outlook.com</span>
+        </span>
+        <LogoutButton />
+      </div>
+
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl tracking-tight text-foreground">

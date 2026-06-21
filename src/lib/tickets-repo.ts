@@ -162,10 +162,15 @@ export async function insertActivity(
   });
   if (error) throw new Error(`Failed to add activity: ${error.message}`);
 
-  await sb
+  // Bump updated_at so the dashboard's "recently updated" sort stays accurate.
+  // Check this error too: a silent failure would leave freshness/sort metadata stale.
+  const { error: bumpErr } = await sb
     .from("tickets")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", ticketId);
+  if (bumpErr) {
+    throw new Error(`Failed to bump ticket updated_at: ${bumpErr.message}`);
+  }
 }
 
 /** Update mutable ticket fields and bump updated_at. */

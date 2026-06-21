@@ -69,3 +69,64 @@ body {
     }
   }
 }
+
+/*
+  Login page atmosphere — stays inside the near-monochrome Typora palette.
+  - .login-grid  faint dot grid, masked to fade at the edges (depth, not noise)
+  - .login-aura  two heavily-blurred soft glows tinted with the status-dot hues,
+                 drifting slowly so the paper feels alive without breaking calm
+  - .login-dot   the signature row of status dots, pulsing in sequence
+*/
+.login-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(31, 30, 28, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 62% at 50% 38%,
+    #000 28%,
+    transparent 76%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 62% at 50% 38%,
+    #000 28%,
+    transparent 76%
+  );
+}
+
+.login-dot {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-aura {
+    animation: aura-drift 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes aura-drift {
+    from {
+      transform: translate3d(-2%, -1%, 0) scale(1);
+    }
+    to {
+      transform: translate3d(2%, 2%, 0) scale(1.08);
+    }
+  }
+
+  .login-dot {
+    animation: dot-pulse 2.6s ease-in-out infinite;
+  }
+
+  @keyframes dot-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.82);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}

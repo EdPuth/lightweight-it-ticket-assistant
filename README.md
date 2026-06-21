@@ -5,18 +5,24 @@ small company's internal IT support team handles employee requests, and is a pra
 project for frontend pages, data modeling, state management, a mock AI reply, and a
 two-agent development workflow.
 
-> Practice project: **no backend, no database, no real AI API** — everything runs on mock
-> data in the browser.
+> Practice project: Supabase persistence is enabled and the app is gated behind a single
+> shared login, but there is **no per-user auth / RLS** and **no real AI API**. Do not use
+> real employee/customer data in the public demo.
 
 ## Features (implemented)
 
+- **Sign in** (`/login`) — the whole app is gated behind a single shared account
+  (`itsupport@outlook.com` / `123456`). Credentials are checked server-side; a successful
+  login sets an httpOnly session cookie and `src/proxy.ts` redirects unauthenticated
+  visitors to `/login`. Sign out clears the session.
 - **Dashboard** (`/`) — status stat cards (Open / In Progress / Waiting / Resolved) that
   double as a status filter, plus search and a priority filter over a sorted ticket list.
 - **Ticket detail** (`/tickets/[id]`) — full ticket view, requester metadata, description,
   activity timeline, **change status**, **assign a technician**, and **add an internal
   note**. Invalid ids show a friendly "ticket not found" state.
 - **Create ticket** (`/tickets/new`) — controlled form (requester, email, title, category,
-  priority, description) with inline validation and a mock success state.
+  priority, description) with inline validation; successful submissions are persisted to
+  Supabase and redirect to the new ticket detail page.
 - **AI suggested reply** (mock) — on the detail page, generates a draft reply from a local
   solution-template library (no real LLM). Copy it or insert it into the timeline as a
   reply. Clearly labelled "Suggested draft — review before sending".
@@ -30,7 +36,9 @@ Server Actions using a server-only service-role key.
 
 Still mock / out of scope:
 
-- **No auth** — anyone who can open the app can read/write (practice/demo only).
+- **Single shared login, not real auth** — one hardcoded account gates the app, but there
+  are no per-user accounts, roles, or Supabase RLS policies; DB writes still use the
+  service-role key. Real production auth = Supabase Auth + RLS + anon key (future direction).
 - **AI replies** are generated from **local templates** (`src/lib/reply-templates.ts`), not a
   real language model.
 
@@ -58,8 +66,9 @@ npm run build    # production build (the gate before each commit)
 
 Deployed on Vercel (imports this GitHub repo). Set `SUPABASE_URL` and
 `SUPABASE_SERVICE_ROLE_KEY` as Vercel environment variables (no `NEXT_PUBLIC_`
-prefix). See `docs/db-setup.md`. Note: there is **no auth**, so a public
-deployment is readable/writable by anyone — fine for a demo, not for real data.
+prefix). See `docs/db-setup.md`. The app is gated behind a single shared login
+(optionally override `AUTH_EMAIL` / `AUTH_PASSWORD` / `AUTH_SESSION_TOKEN` via env);
+this is a practice gate, not per-user auth — fine for a demo, not for real data.
 
 ## Project structure
 
@@ -86,9 +95,9 @@ deployment is readable/writable by anyone — fine for a demo, not for real data
 - The two agents do not call each other; they hand off through Git + the `docs/` files.
   See `AGENTS.md` and `docs/tasks.md`.
 
-## Future directions (not in this MVP)
+## Future directions (post-MVP)
 
-Real persistence (Supabase / Firebase), auth & roles, a real AI API, deployment to Vercel,
-keyword search over past tickets, and an email-issue knowledge base. The AI reply's
+Auth & roles, Row Level Security policies using the anon key, a real AI API, keyword search
+over past tickets, and an email-issue knowledge base. The AI reply's
 `src/lib/reply-templates.ts` is already structured as a seed for the last two — see decision
 D8 in `docs/decisions.md`.

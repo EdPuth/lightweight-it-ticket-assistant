@@ -99,3 +99,42 @@
 - **理由**：服务端持密钥最简单安全；repo 层让组件改动最小、易 review；类型不变保护既有代码。
 - **影响 / 注意**：现阶段**无登录**，任何访问者可读写（practice/演示用）。生产化需 Supabase Auth +
   RLS policies + anon key，列入后续方向。`mock-tickets.ts` 保留为种子来源（`scripts/gen-seed.ts`）。
+
+## D11 — Server Actions 加无依赖 runtime validation（接手后第一阶段）
+- **背景**：Codex 在 Database Extension review 提出 [P2]——Server Actions 在运行时是公开 endpoint，
+  目前只靠客户端校验和 TS 类型。直接调用可绕过校验、传超长字符串、或传非法 enum / 错误 `prev`
+  让活动文案不准。另外 [P3]——`insertActivity()` 的 `updated_at` 更新错误被静默忽略。
+- **决定**：
+  - 新增 `src/lib/validation.ts`（**无新依赖**，不引入 Zod）：复用 `ticket-utils.ts` 的
+    `STATUS_ORDER` / `PRIORITY_ORDER` / `CATEGORY_ORDER` 做枚举校验；提供 `validateCreateTicketInput`
+    / `validateStatus` / `validateAssignee` / `validateNoteContent` / `validateTicketId`，
+    统一 trim + 非空 + 长度上限（`LIMITS`），非法输入抛 `ValidationError`。
+  - `src/app/actions.ts` 五个 Action 入口都先校验再落库；空/无变化仍按原逻辑提前返回（客户端已有
+    button disabled 守卫，正常 UX 不变，只有绕过客户端的滥用路径会被拦）。
+  - `src/lib/tickets-repo.ts` 的 `insertActivity()` 现在检查 `updated_at` 更新的 `{ error }` 并抛错。
+- **替代方案**：引入 Zod 做 schema 校验——更声明式，但多一个依赖；Owner 选择保持无依赖（见本次决策）。
+- **理由**：CLAUDE.md 要求不随意加依赖；校验规则简单、复用现有联合常量即可，手写更轻、易 review。
+- **影响**：纯加固，不改数据模型 / UI / 现有正常流程。Auth/RLS（把公开无登录写入收口）仍是独立的
+  后续 scope（需 Owner 开），不在本阶段。
+
+## D12 — 全站登录门禁：单账号 + cookie session + proxy（Owner 要求）
+- **背景**：Owner 希望"只有登录后才能看到 ticket system"，且只允许一个账号：
+  `itsupport@outlook.com` / `123456`，没有别的账号。登录页设计要与现有 Typora 风格一致、带点特效。
+- **决定**（**练习级，非生产 auth**）：
+  - `src/lib/auth.ts`：单账号凭据 + session 常量 + `verifyCredentials` / `isValidSession`。
+    凭据与 session token **仅服务端读**（登录 Action 与 proxy），不进客户端 bundle；可用
+    `AUTH_EMAIL` / `AUTH_PASSWORD` / `AUTH_SESSION_TOKEN` 环境变量覆盖。
+  - `src/app/login/actions.ts`：`loginAction`（校验 → 设 httpOnly session cookie → redirect `/`）
+    + `logoutAction`（删 cookie → redirect `/login`）。
+  - `src/proxy.ts`：**Next.js 16 把 middleware 改名为 proxy**（`proxy.ts`，导出 `proxy` 函数 +
+    `config.matcher`）。未登录访问非 `/login` 路径 → 跳 `/login`；已登录访问 `/login` → 跳 `/`。
+  - 登录页 `src/app/login/page.tsx` + `src/components/login-form.tsx`（`useActionState`）：
+    沿用暖白 + 浮起卡片 + Fraunces 衬线；特效保持克制——状态四圆点 motif 依次脉冲、两团极淡的
+    蓝/琥珀 aura 缓慢漂移、淡点阵网格；均遵循 `prefers-reduced-motion`。
+  - Dashboard 顶部加 "Signed in as … / Sign out"（`src/components/logout-button.tsx`）。
+- **替代方案**：Supabase Auth + RLS + anon key（真正的 per-user 认证）——是后续生产化方向，
+  本次按 Owner 要求只做单账号门禁，范围更小。
+- **理由 / 局限**：单账号共享凭据、session cookie 是固定不签名 token、DB 写仍用 service-role
+  （门禁是应用层不是数据库层）。满足"登录才可见"的练习需求，但**不是**生产安全模型。
+- **影响**：新增 `proxy.ts`（全站门禁）；无新依赖。Codex DB review 的 [P2 公开无登录写入] 在
+  应用层被收口（仍非 RLS）。生产化下一步仍是 Supabase Auth + RLS（见 D10）。

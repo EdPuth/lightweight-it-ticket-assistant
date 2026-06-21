@@ -8,6 +8,13 @@ import {
   updateTicketFields,
 } from "@/lib/tickets-repo";
 import { STATUS_LABELS } from "@/lib/ticket-utils";
+import {
+  validateAssignee,
+  validateCreateTicketInput,
+  validateNoteContent,
+  validateStatus,
+  validateTicketId,
+} from "@/lib/validation";
 import type { TicketCategory, TicketPriority, TicketStatus } from "@/lib/types";
 
 const AUTHOR = "IT Support";
@@ -23,10 +30,12 @@ export type CreateTicketInput = {
 
 // Create a ticket, log a "created" activity, then go to its detail page.
 export async function createTicketAction(input: CreateTicketInput) {
-  const id = await insertTicket({ ...input, status: "open" });
+  // Server Actions are public endpoints: validate before trusting the input.
+  const data = validateCreateTicketInput(input);
+  const id = await insertTicket({ ...data, status: "open" });
   await insertActivity(id, {
     type: "created",
-    author: input.requesterName,
+    author: data.requesterName,
     content: "Ticket created.",
   });
   revalidatePath("/");
@@ -38,15 +47,18 @@ export async function changeStatusAction(
   prev: TicketStatus,
   next: TicketStatus,
 ) {
-  if (prev === next) return;
-  await updateTicketFields(ticketId, { status: next });
-  await insertActivity(ticketId, {
+  const id = validateTicketId(ticketId);
+  const from = validateStatus(prev, "Previous status");
+  const to = validateStatus(next, "Status");
+  if (from === to) return;
+  await updateTicketFields(id, { status: to });
+  await insertActivity(id, {
     type: "status_changed",
     author: AUTHOR,
-    content: `Status changed from ${STATUS_LABELS[prev]} to ${STATUS_LABELS[next]}.`,
+    content: `Status changed from ${STATUS_LABELS[from]} to ${STATUS_LABELS[to]}.`,
   });
   revalidatePath("/");
-  revalidatePath(`/tickets/${ticketId}`);
+  revalidatePath(`/tickets/${id}`);
 }
 
 export async function assignAction(
@@ -54,35 +66,38 @@ export async function assignAction(
   prev: string,
   next: string,
 ) {
-  if (prev === next) return;
-  await updateTicketFields(ticketId, { assignedTo: next || null });
-  await insertActivity(ticketId, {
+  const id = validateTicketId(ticketId);
+  const from = validateAssignee(prev);
+  const to = validateAssignee(next);
+  if (from === to) return;
+  await updateTicketFields(id, { assignedTo: to || null });
+  await insertActivity(id, {
     type: "note",
     author: AUTHOR,
-    content: next ? `Assigned to ${next}.` : "Unassigned.",
+    content: to ? `Assigned to ${to}.` : "Unassigned.",
   });
   revalidatePath("/");
-  revalidatePath(`/tickets/${ticketId}`);
+  revalidatePath(`/tickets/${id}`);
 }
 
 export async function addNoteAction(ticketId: string, content: string) {
-  const trimmed = content.trim();
-  if (!trimmed) return;
-  await insertActivity(ticketId, {
+  const id = validateTicketId(ticketId);
+  const trimmed = validateNoteContent(content, "Note");
+  await insertActivity(id, {
     type: "note",
     author: AUTHOR,
     content: trimmed,
   });
-  revalidatePath(`/tickets/${ticketId}`);
+  revalidatePath(`/tickets/${id}`);
 }
 
 export async function insertReplyAction(ticketId: string, content: string) {
-  const trimmed = content.trim();
-  if (!trimmed) return;
-  await insertActivity(ticketId, {
+  const id = validateTicketId(ticketId);
+  const trimmed = validateNoteContent(content, "Reply");
+  await insertActivity(id, {
     type: "reply",
     author: AUTHOR,
     content: trimmed,
   });
-  revalidatePath(`/tickets/${ticketId}`);
+  revalidatePath(`/tickets/${id}`);
 }

@@ -288,3 +288,42 @@
 1. No required Phase 6 code fixes.
 2. If the owner wants to continue, open a new post-MVP phase and choose exactly one next feature, such as persistence or keyword search.
 3. Keep README and `docs/tasks.md` updated if the project scope expands.
+
+### Database Extension — Supabase + Vercel
+- 状态：✅ Reviewed by Codex on 2026-06-20
+
+#### Summary
+- The Supabase migration is coherent and beginner-friendly: DB access is isolated in `tickets-repo.ts`, pages read through Server Components, and writes go through Server Actions.
+- The service-role key is only referenced server-side and is not exposed with a `NEXT_PUBLIC_` prefix.
+- Schema basics are solid for this scale: check constraints are present, `activities.ticket_id` has an index, and RLS is enabled with no public policies.
+- Vercel/Supabase deployment is now beyond the original MVP, so the main remaining concern is scope and security posture rather than component structure.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅ after allowing network for `next/font` Google Fonts
+- Source scan reviewed Supabase env usage, server-only client usage, Server Actions, SQL schema, seed/docs, and obvious client storage/API leaks ✅
+- Read-only localhost smoke test ✅
+  - `/` returned 200 and rendered DB-backed ticket data
+  - `/tickets/TKT-1001` returned 200
+  - `/tickets/new` returned 200
+
+#### Findings
+- **P2 — Public deployment has persistent unauthenticated writes.** This is documented as a practice/demo limitation, but it is now materially different from the earlier mock-only MVP: anyone who can open the Vercel URL can create tickets, change status, assign technicians, and add notes/replies. Do not put real data in this Supabase project. If the app remains publicly deployed, the next real scope should be Supabase Auth + RLS policies + anon-key access.
+- **P2 — Server Actions trust client-side validation and client-provided transition metadata.** `src/app/actions.ts` accepts typed values, but Server Actions are public endpoints at runtime. A direct caller can bypass the create form's validation, send very large strings, or pass misleading `prev` values to `changeStatusAction`, producing inaccurate activity text. Add shared server-side validators for create/status/assignee/note/reply inputs before treating this as more than a demo.
+- **P3 — `insertActivity()` ignores the result of the ticket `updated_at` update.** In `src/lib/tickets-repo.ts`, the activity insert checks errors, but the follow-up `tickets.update({ updated_at })` is awaited without inspecting `{ error }`. If that update fails, the user sees the activity but sorting/freshness metadata can silently become stale.
+- **P3 — Dashboard sends full ticket objects to the client.** `listTickets()` returns every ticket with description, requester email, and activities, then `DashboardClient` receives that whole array. Fine for a practice app with public data, but if auth/real data is added, create a lighter list DTO for dashboard rows.
+- **P3 — README had stale mock-only wording.** It still said "no backend, no database" and listed persistence/deployment as future work. I updated README during this review to reflect Supabase persistence and Vercel deployment.
+
+#### High-Priority Issues
+- None blocking the practice project.
+- Security note: the no-auth public write model becomes high priority if the URL is shared broadly or any real/private data is entered.
+
+#### Scope / Architecture Notes
+- Keep the current service-role approach only for this practice/demo phase.
+- Do not add a large auth abstraction yet. The clean next step is narrow: Supabase Auth, RLS policies, and moving browser-safe reads/writes to the anon key where appropriate.
+- Avoid jumping straight into a real AI API before the data access/security model is tightened.
+
+#### Next Actions For Claude Code
+1. Add runtime validation inside all Server Actions, reusing the existing union constants/labels where possible and keeping it dependency-free unless the owner approves a small validator like Zod.
+2. Check and throw on the `updated_at` update error in `insertActivity()`.
+3. If continuing toward production-like behavior, plan a separate Auth/RLS phase before keyword search or real AI.
