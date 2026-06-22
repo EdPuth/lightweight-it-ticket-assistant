@@ -138,3 +138,35 @@
   （门禁是应用层不是数据库层）。满足"登录才可见"的练习需求，但**不是**生产安全模型。
 - **影响**：新增 `proxy.ts`（全站门禁）；无新依赖。Codex DB review 的 [P2 公开无登录写入] 在
   应用层被收口（仍非 RLS）。生产化下一步仍是 Supabase Auth + RLS（见 D10）。
+
+## D13 — Ticket 生命周期（closed 状态 + active-only Dashboard）+ 删除 + 登录门禁加固
+- **背景**：Owner 要求"能删除 ticket"且"按状态查看 ticket，而不是全部堆在 Dashboard"。Codex 在
+  「Hardening + Login Gate」review 提出：先修门禁安全（默认 token 可伪造、Server Actions 未在
+  action 内验 session、`changeStatusAction` 仍信任客户端 `prev`），再做删除。本阶段按 Codex 顺序：
+  **先加固安全 → 再加 closed/筛选 → 最后删除**。
+- **决定**：
+  - **安全（先做）**：
+    - `src/lib/auth.ts`：production 必须提供 `AUTH_SESSION_TOKEN`，否则启动即抛错；dev 用
+      `itsa.session.v1.dev-only` 仅本地回退，源码默认 token 不再能在生产伪造 session。
+    - 新增 `src/lib/session.ts` 的 `requireSession()`，在**每个**写操作 Server Action 开头调用
+      （create / changeStatus / assign / addNote / insertReply / delete）；不再只靠 `proxy.ts`。
+    - `changeStatusAction` / `assignAction` 改为**服务端从 DB 读当前值**（`getTicketFields`），
+      不再信任客户端传入的 `prev`，timeline 文案无法被伪造；签名简化为 `(ticketId, next)`。
+  - **生命周期 / 按状态查看**：
+    - 新增 `closed` 状态（types / `ticket-utils` labels·dot·order·count / SQL check / 详情 select）。
+      语义：`resolved` = 已解决保留可查，`closed` = 关闭归档但保留历史。
+    - `ACTIVE_STATUSES = open/in_progress/waiting`；Dashboard 默认只显示 active，`resolved`/`closed`
+      需点对应状态卡片显式筛选才出现；结果行注明"active tickets"+ 隐藏数量提示，避免误以为没数据。
+    - 统计卡片改 5 张（`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`），计数基于全部工单。
+  - **删除**：`deleteTicketAction`（requireSession + 校验 + `deleteTicket` + revalidate + redirect `/`）；
+    `src/lib/tickets-repo.ts` 的 `deleteTicket` 走 hard delete，activities 由 DB `on delete cascade`
+    清除（与 tasks.md 计划一致，优先 hard delete，审计需求以后再做 soft delete）；UI 为详情页底部
+    红色 danger 区 + 二次确认（`src/components/delete-ticket.tsx`）。
+- **替代方案**：soft delete（保留审计）——本阶段先 hard delete 更简单；以后要审计再改。
+- **影响 / 必须的运维动作**：
+  - 现有 Supabase 库需跑一次 `supabase/migration-2026-06-21-add-closed-status.sql` 才允许 `closed`
+    （否则把工单改成 Closed 会被旧 check 约束拒绝）。本地只有 PostgREST key、无法跑 DDL，需 Owner 在
+    Supabase SQL Editor 执行。
+  - Vercel 生产环境**必须**设 `AUTH_SESSION_TOKEN`（强随机），否则部署后运行时会抛错。可选设
+    `AUTH_EMAIL` / `AUTH_PASSWORD`。`.env.example` 已补说明。
+- **仍未做（后续 scope）**：per-user auth / RLS（替换单账号门禁）；Dashboard list DTO（[P3]）。

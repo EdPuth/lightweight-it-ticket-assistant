@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  ACTIVE_STATUSES,
   applyTicketFilters,
   countByStatus,
   sortByUpdatedDesc,
+  STATUS_LABELS,
   STATUS_ORDER,
 } from "@/lib/ticket-utils";
 import type { PriorityFilter, StatusFilter, Ticket, TicketStatus } from "@/lib/types";
@@ -23,10 +25,19 @@ export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
 
   const counts = useMemo(() => countByStatus(tickets), [tickets]);
 
+  // Default view shows active tickets only. Resolved/closed are reachable by
+  // clicking their status card (which sets an explicit status filter).
   const visibleTickets = useMemo(() => {
-    const filtered = applyTicketFilters(tickets, { status, priority, query });
+    const byStatus =
+      status === "all"
+        ? tickets.filter((t) => ACTIVE_STATUSES.includes(t.status))
+        : tickets.filter((t) => t.status === status);
+    const filtered = applyTicketFilters(byStatus, { priority, query });
     return sortByUpdatedDesc(filtered);
   }, [tickets, status, priority, query]);
+
+  // How many tickets are hidden by the active-only default (so we can say so).
+  const hiddenCount = counts.resolved + counts.closed;
 
   const hasActiveFilters =
     status !== "all" || priority !== "all" || query.trim() !== "";
@@ -68,7 +79,7 @@ export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
         </Link>
       </header>
 
-      <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {STATUS_ORDER.map((value, index) => (
           <div
             key={value}
@@ -97,11 +108,19 @@ export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
       </section>
 
       <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between px-1">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1">
           <span className="text-xs text-faint">
             {visibleTickets.length}{" "}
             {visibleTickets.length === 1 ? "result" : "results"}
+            {status === "all"
+              ? " · active tickets"
+              : ` · ${STATUS_LABELS[status]}`}
           </span>
+          {status === "all" && hiddenCount > 0 ? (
+            <span className="text-xs text-faint">
+              {hiddenCount} resolved/closed hidden — open a status card to view
+            </span>
+          ) : null}
         </div>
         <TicketList tickets={visibleTickets} hasActiveFilters={hasActiveFilters} />
       </section>

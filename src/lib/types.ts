@@ -1,7 +1,12 @@
 // 工单领域的核心类型定义。
 // 全部使用字面量联合类型（来自 docs/project-brief.md §数据模型），不使用 any。
 
-export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved';
+export type TicketStatus =
+  | 'open'
+  | 'in_progress'
+  | 'waiting'
+  | 'resolved'
+  | 'closed';
 
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
 

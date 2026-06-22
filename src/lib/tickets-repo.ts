@@ -111,6 +111,28 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
   return mapTicket(ticket as TicketRow, (activities ?? []) as ActivityRow[]);
 }
 
+/**
+ * Fetch just the mutable fields of a ticket (no activities), or null if missing.
+ * Used by Server Actions to read the authoritative current state instead of
+ * trusting client-provided values.
+ */
+export async function getTicketFields(
+  id: string,
+): Promise<{ status: TicketStatus; assignedTo: string } | null> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("tickets")
+    .select("status, assigned_to")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to load ticket: ${error.message}`);
+  if (!data) return null;
+
+  const row = data as { status: TicketStatus; assigned_to: string | null };
+  return { status: row.status, assignedTo: row.assigned_to ?? "" };
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
@@ -187,4 +209,14 @@ export async function updateTicketFields(
 
   const { error } = await sb.from("tickets").update(patch).eq("id", ticketId);
   if (error) throw new Error(`Failed to update ticket: ${error.message}`);
+}
+
+/**
+ * Permanently delete a ticket. The activities table has
+ * `on delete cascade`, so its activities are removed too.
+ */
+export async function deleteTicket(ticketId: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("tickets").delete().eq("id", ticketId);
+  if (error) throw new Error(`Failed to delete ticket: ${error.message}`);
 }

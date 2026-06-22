@@ -21,128 +21,14 @@
 ---
 
 ## Completed
-- **Phase 0 — Setup & Docs**
-  - 用 create-next-app 初始化 Next.js 16 + TypeScript + Tailwind v4（App Router、`src/` 目录）。
-  - 创建 README.md、CLAUDE.md、AGENTS.md。
-  - 创建 docs/：project-brief.md、frontend-spec.md、tasks.md、decisions.md、
-    codex-review.md（占位）、prompts/claude-plan-mode-prompt.md、prompts/codex-review-prompt.md。
-  - git 已初始化（脚手架完成首次 commit）。
-- **Codex Review — Phase 0**
-  - 已核对 PDF、project brief、tasks、README、agent prompts 和当前源码。
-  - `npm run lint` 与 `npm run build` 均通过。
-  - `docs/codex-review.md` 已更新；未发现高优先级阻塞问题。
-- **Phase 1 — Data Model**
-  - `src/lib/types.ts`：Ticket / TicketActivity + 字面量联合类型（status/priority/category/
-    activity type）+ StatusFilter / PriorityFilter（供 Phase 2 复用）。无 `any`。
-  - `src/lib/mock-tickets.ts`：10 条多样化 mock 工单，覆盖各 status/priority/category，每条带
-    activity timeline。
-  - `src/lib/ticket-utils.ts`：纯函数 getTicketById / searchTickets / filterTickets /
-    applyTicketFilters / countByStatus / sortByUpdatedDesc，确定性日期格式化
-    formatDateTime / formatRelativeTime，集中的 label 与 badge 颜色映射 + 顺序数组。
-  - `npm run lint` 与 `npm run build` 均通过。未引入任何新依赖。
-- **Codex Review — Phase 1**
-  - 已 review `src/lib/types.ts`、`src/lib/mock-tickets.ts`、`src/lib/ticket-utils.ts`。
-  - `npm run lint` 与 `npm run build` 均通过。
-  - `docs/codex-review.md` 已追加 Phase 1 review；未发现高优先级阻塞问题。
-
-- **Phase 2 — Dashboard & Ticket List**
-  - Owner 设计方向：refined minimal / editorial（Typora 风格）—— 暖白底 + 纯白浮起卡片、近乎单色、
-    衬线标题/数字、状态圆点为唯一彩色。记录于 `docs/decisions.md` D6。
-  - 字体：next/font 引入 Fraunces（衬线）/ Hanken Grotesk（正文）/ JetBrains Mono（ID），
-    非 npm 依赖；中文回退 PingFang。
-  - 组件：`status-badge.tsx`、`priority-badge.tsx`、`stat-card.tsx`（可点击=状态筛选）、
-    `ticket-filters.tsx`（搜索 + 优先级 select + 清除）、`ticket-card.tsx`（浮起卡片）、
-    `ticket-list.tsx`（含"无工单"与"无匹配"两种空状态）。颜色统一来自 `ticket-utils.ts` 的 DOT 映射。
-  - `src/app/page.tsx`：`'use client'` + `useState`/`useMemo`，统计、搜索 + 状态 + 优先级筛选、
-    按更新时间排序。无 URL searchParams。
-  - 替换 starter 的 `layout.tsx` metadata 与首页；移除 dark-mode 自动切换（固定白色基调）。
-  - 将 `ticket-utils.ts` 的 `*_BADGE_CLASS` 改为 `*_DOT_CLASS`（圆点配色），契合单色设计。
-  - `npm run lint` / `npm run build` 通过；浏览器验证统计/筛选/搜索/无结果空状态均可用。未加 npm 依赖。
-  - 微交互打磨：hover 悬浮抬升（cubic-bezier 丝滑缓动）；进场卡片"逐个浮现"（`.rise` fade-up +
-    错开 animation-delay）。入场放外层包裹、hover 放卡片本身分层，避免动画 fill 顶掉 hover；
-    遵循 `prefers-reduced-motion`。
-- **Codex Review — Phase 2**
-  - 已 review Dashboard 页面、filters/list/card/badge/stat 组件、CSS tokens、D6 决策记录。
-  - `npm run lint` 与 `npm run build` 均通过。
-  - 浏览器验证通过：页面加载、状态筛选、优先级筛选、搜索无结果、清除筛选、移动端首屏。
-  - `docs/codex-review.md` 已追加 Phase 2 review；未发现高优先级阻塞问题。
-
-- **Phase 3 — Ticket Detail Page**（`/tickets/[id]`）
-  - `src/app/tickets/[id]/page.tsx`：Server Component，`params: Promise<{id}>` 并 `await params`；
-    `getTicketById` 查不到时渲染友好"未找到工单"组件（非默认 404）；`generateMetadata` 动态标题。
-  - `ticket-detail.tsx`（client）：本地 state 管理状态切换与新增备注（仅内存），复用 StatusBadge /
-    PriorityBadge / formatDateTime / STATUS_ORDER / CATEGORY_LABELS。
-  - `activity-timeline.tsx`：发丝竖线 + 彩色圆点的处理记录时间线，复用 ACTIVITY_TYPE_LABELS。
-  - 操作：更改状态（select，追加 status_changed 活动 + 更新 updatedAt）、添加内部备注（追加 note 活动）。
-  - 处理 Codex Phase 1 P3：为 TKT-1005 / 1007 / 1008 补齐 open→in_progress 中间状态变更活动。
-  - `npm run lint` / `npm run build` 通过；浏览器验证：详情渲染、改状态、加备注、无效 id 友好、无 console 报错。
-- **Codex Review — Phase 3**
-  - 已 review `/tickets/[id]` route、`ticket-detail.tsx`、`activity-timeline.tsx` 和 mock timeline 补齐。
-  - `npm run lint` 与 `npm run build` 均通过；build 输出包含动态路由 `/tickets/[id]`。
-  - 浏览器验证通过：详情渲染、动态标题、状态切换、新增备注、无效 id 友好页面、移动端首屏。
-  - `docs/codex-review.md` 已追加 Phase 3 review；未发现高优先级阻塞问题。
-
-- **本地化 — 产品 UI 改英文**（决策 D7）
-  - mock 工单（标题/描述/活动）、ticket-utils 的 ACTIVITY_TYPE_LABELS 与 formatRelativeTime、
-    Dashboard / filters / list / card / detail / `[id]` route / layout metadata、`<html lang="en">`
-    全部英文。docs 仍中文（Owner 偏好）。`lint`/`build` 通过。
-- **Phase 4 — Create Ticket Page**（`/tickets/new`，英文）
-  - `src/app/tickets/new/page.tsx`（client）：受控表单 requesterName / email / title /
-    category / priority / description；复用 CATEGORY_/PRIORITY_ ORDER + LABELS。
-  - 校验：必填 + 邮箱格式；行内错误（红框 + 字段下方提示）；可访问（label htmlFor、
-    aria-invalid、aria-describedby）；编辑字段即清除该项错误。
-  - 提交：因无后端/store（不引入 Zustand），采用**原地成功确认**（显示生成 id + 标题 +
-    "mock 不持久化" 说明 + Create another / Back to dashboard），而非跳详情页导致 404。
-  - 解决 "+ 新建工单" → `/tickets/new` 的 404（Codex Phase 2 P2 剩余一半）。
-  - `npm run lint` / `npm run build` 通过；浏览器验证：空提交报错、合法提交成功、无 console 报错。
-- **Codex Review — Phase 4**
-  - 已 review `/tickets/new` 表单、英文 UI 本地化、D7 决策记录和 mock 提交流程。
-  - `npm run lint` 与 `npm run build` 均通过；build 输出包含静态路由 `/tickets/new`。
-  - 浏览器验证通过：空提交错误、邮箱格式错误、字段错误清除、合法提交成功、Create another 重置、
-    Back to dashboard、移动端首屏。
-  - `docs/codex-review.md` 已追加 Phase 4 review；未发现高优先级阻塞问题。
-
-- **Phase 5 — AI Suggested Reply（mock）**
-  - `src/lib/reply-templates.ts`：数据驱动方案模板库 `solutionTemplates`（含 .ost 过满、inbox
-    访问、Outlook classic 同步三例）+ 纯函数 `matchScore` / `findRelevantTemplates` /
-    `generateSuggestedReply`（无真实 LLM）。为后续知识库 / 关键词搜索预留扩展点（决策 D8）。
-  - `ai-suggested-reply.tsx`：idle → loading（skeleton）→ generated；可编辑草稿；
-    Copy / Insert as reply / Regenerate；醒目 "Suggested draft — review before sending" 标注。
-  - 接入 `ticket-detail.tsx`：`handleInsertReply` 复用现有本地 timeline state，追加 reply 活动。
-  - 顺带处理 Codex P3：创建页 mock id 改为 timestamp-based；详情 metadata 改为语义 `<dl>`。
-  - `npm run lint` / `npm run build` 通过；浏览器验证：生成（Outlook ticket 命中模板）、复制、
-    Insert as reply 入时间线、无 console 报错。
-
-- **Enhancement — 详情页 Assignee 可手动选择**（Owner 要求）
-  - `ticket-utils.ts` 新增 `TECHNICIANS = ['Kyle','John','Kevin']`（集中、可增减）。
-  - `ticket-detail.tsx`：Assignee 从只读改为 `<select>`（Unassigned + 技师；若工单原 assignee
-    不在名单内，如 "IT - Daniel"，自动并入选项以反映真实值）；切换时追加一条 note 活动
-    "Assigned to X." / "Unassigned." 并更新 metadata。仅内存。
-  - `lint` / `build` 通过；浏览器验证：选项正确、切换更新 metadata + 时间线、无 console 报错。
-- **Codex Review — Phase 5**
-  - 已 review `reply-templates.ts`、`ai-suggested-reply.tsx`、详情页接入、Assignee select 增强。
-  - `npm run lint` 与 `npm run build` 均通过；未发现真实 API / env key / 新依赖。
-  - 浏览器验证通过：生成草稿、Insert as reply 入 timeline、Assignee 切换、移动端无横向溢出、无 console 报错。
-  - `docs/codex-review.md` 已追加 Phase 5 review；未发现高优先级阻塞问题，但有两个 Phase 6 应优先处理的 P2/P3。
-
-- **Phase 6 — Polish, Accessibility, README**
-  - 处理 Codex Phase 5 P2（模板匹配过宽）：`matchScore` 只数**具体关键词**命中（category 不再
-    自动 +2，移除 `.ost`/`access`/`outlook` 等过泛词），`findRelevantTemplates` 要求 ≥1 命中，
-    否则回退 category 级致谢。验证：TKT-1001（登录）、TKT-1005（GitHub）不再误命中。
-  - 新增 3 条精准匹配模板的 mock 工单（TKT-1011 .ost 满 / 1012 Outlook classic 不同步 /
-    1013 申请 shared mailbox delegate access），让模板库可见地工作（共 13 张）。
-  - 处理 Codex Phase 5 P3：复制失败显示 "Copy failed — select & copy manually"。
-  - 处理 Codex Phase 2 P3：去重——移除空状态里的 "Clear filters"，仅保留 filter bar 一处。
-  - 重写 README：implemented 功能 + mock 限制（不持久、刷新重置、AI 为本地模板）。
-  - `npm run lint` / `npm run build` 通过；浏览器全量 smoke（含 mobile 375px 无横向溢出、无 console 报错）。
-- **Codex Review — Phase 6**
-  - 已 review Phase 6 polish、README、AI 模板匹配、copy 失败反馈、empty state 去重和最终 MVP 范围。
-  - `npm run lint` 与 `npm run build` 均通过；未发现真实 API / env key / storage / 新依赖。
-  - 浏览器验证通过：Dashboard、筛选无结果、TKT-1001/TKT-1005 fallback、TKT-1011 `.ost` 模板、
-    copy failure feedback、Insert as reply、移动端 Dashboard/detail/create 无横向溢出、无 console 报错。
-  - `docs/codex-review.md` 已追加 Phase 6 review；未发现需要阻塞 MVP 收尾的代码问题。
-
-- **MVP 六个阶段全部完成**（Definition of Done 已满足，Phase 6 最终 review 已过）。
+- **MVP Phases 0-6 — Completed Summary**
+  - Set up Next.js 16 / React 19 / Tailwind v4, project docs, prompts, and two-agent workflow.
+  - Built the mock-ticket foundation: typed `Ticket` / `TicketActivity`, mock data, utility functions, labels, ordering, badges, and date formatting.
+  - Built the Typora-style Dashboard with status cards, priority filter, search, ticket list, empty states, and responsive polish.
+  - Built `/tickets/[id]` detail pages with metadata, timeline, status changes, internal notes, assignee selection, and friendly invalid-id state.
+  - Built `/tickets/new` with accessible controlled form validation and later migrated submit behavior from mock to Supabase persistence.
+  - Built mock AI suggested replies from local solution templates, including copy/insert/regenerate states and tighter keyword matching.
+  - Completed English UI localization, README accuracy pass, accessibility/responsive smoke checks, and Codex reviews with no remaining Phase 0-6 blockers.
 
 - **Database Extension — Step 1（Supabase 脚手架）**
   - 加依赖 `@supabase/supabase-js`（决策 D9）。
@@ -192,6 +78,30 @@
     （`src/components/logout-button.tsx`）。
   - `npm run lint` / `npm run build` 通过；浏览器验证全流程：未登录 `/`→`/login`、错误凭据报错、
     正确凭据 → Dashboard、Sign out → 重新被门禁拦截，无 console 报错。无新依赖。
+- **Codex Review — Hardening + Login Gate**
+  - 已 review `validation.ts`、`auth.ts`、`proxy.ts`、login actions/page/form、Dashboard logout、
+    Server Actions 加固和 repo 更新。
+  - `npm run lint` / `npm run build` 通过；Browser smoke 通过：未登录跳 `/login`、错误凭据报错、
+    正确登录进入 Dashboard、Sign out 返回 `/login`、移动端无横向溢出、无 console 报错。
+  - 发现需先修的风险：默认 `AUTH_SESSION_TOKEN` 可伪造；Server Actions 仍未在 action 内显式验 session；
+    status timeline 的 `prev` 仍来自客户端。详见 `docs/codex-review.md` 最新一节。
+
+- **Lifecycle + Delete + Auth Hardening（决策 D13，按 Codex 顺序：先安全→再 closed/筛选→最后删除）**
+  - 安全：`auth.ts` 生产强制 `AUTH_SESSION_TOKEN`（缺失即抛错，dev 用 dev-only 回退）；新增
+    `session.ts` 的 `requireSession()` 并加到全部 6 个写 Action；`changeStatusAction` /
+    `assignAction` 改为服务端读 DB 当前值（`getTicketFields`），不再信任客户端 `prev`，签名简化为
+    `(ticketId, next)`。
+  - 生命周期：新增 `closed` 状态（types / `ticket-utils` / SQL check + 迁移文件 / 详情 select）；
+    `ACTIVE_STATUSES`；Dashboard 默认只显示 active，resolved/closed 需点状态卡片；统计卡片 5 张 +
+    结果行隐藏数量提示。
+  - 删除：`deleteTicketAction`（requireSession + 校验 + hard delete + cascade + redirect `/`）+
+    `tickets-repo.deleteTicket` + 详情页红色 danger 区二次确认（`delete-ticket.tsx`）。
+  - `.env.example` 补 `AUTH_EMAIL` / `AUTH_PASSWORD` / `AUTH_SESSION_TOKEN`；README / handoff 同步。
+  - `npm run lint` / `npm run build` 通过；浏览器验证：active-only 默认 + 隐藏提示、点 Resolved 卡片出
+    3 条、改状态 timeline 文案用 DB prev（Open→In Progress）、删除 TKT-1015 后回 Dashboard 且总数 15→14、
+    无 console 报错。
+  - **运维待办（需 Owner）**：① Supabase 跑 `supabase/migration-2026-06-21-add-closed-status.sql`
+    才允许 `closed`；② Vercel 设 `AUTH_SESSION_TOKEN` 否则生产运行时抛错。
 
 ## Next（下一步）
 - **Database Extension 全部完成**：本地 + 线上都连同一个 Supabase 库，读写持久化。
@@ -200,8 +110,15 @@
 - 真正"生产化"的下一步（需 Owner 开新 scope）：**Supabase Auth + RLS policies + anon key**（替换单账号门禁）。
 - ~~短期修补：Server Actions runtime validation + `insertActivity()` 检查 `updated_at` 更新错误~~：
   已完成（见 Completed 的 Hardening 条目 + 决策 D11）。**部署前需把改动 push 到 Vercel 才会生效。**
+- ~~先修登录门禁风险，再做 delete~~：已完成（决策 D13）——生产强制 `AUTH_SESSION_TOKEN`、
+  `requireSession()` 进所有写 Action、`.env.example` 已补说明。
+- ~~Owner 需求 — ticket lifecycle + delete~~：已完成（决策 D13）——`closed` 状态、Dashboard
+  active-only 默认、resolved/closed 走状态卡片、详情页 confirm-gated hard delete（cascade）。
+- **本阶段后的运维待办（需 Owner 操作，否则功能不完整）：**
+  - Supabase SQL Editor 跑 `supabase/migration-2026-06-21-add-closed-status.sql`（否则改 Closed 报错）。
+  - Vercel 设强随机 `AUTH_SESSION_TOKEN` 环境变量（否则生产部署运行时抛错）。
 - Dashboard 仍把完整 ticket 下发到 client（Codex DB review [P3]）：公开 demo 可接受；接真实/私有数据前再做轻量 list DTO。
-- 现在线上是公开无登录，任何人可读写。之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
+- 之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -209,9 +126,16 @@
 - 范围蔓延风险：MVP + DB extension 已完成；后续不要顺手扩成企业级 helpdesk，除非 Owner 明确开新 scope。
 - README 已在 DB review 中更新为 Supabase persistence + Vercel deployment；后续如果扩 scope，需要同步维护。
 - ~~公开无登录 + 持久化写入~~：已加全站登录门禁（单账号，D12），应用层收口。**但仍是单账号共享凭据 + service-role 写**，不是 per-user auth / RLS；真实数据仍必须先做 Supabase Auth + RLS。
+- ~~默认 session token 可伪造~~：已修（D13）——生产强制 `AUTH_SESSION_TOKEN`，缺失即抛错；
+  dev 回退 token 仅本地用。**注意：Vercel 必须设置该环境变量，否则生产运行时报错。**
+- ~~Server Actions 缺 action-level session check~~：已修（D13）——所有写 Action 开头 `requireSession()`。
+- ~~`changeStatusAction()` 信任客户端 `prev`~~：已修（D13）——服务端从 DB 读当前状态（`assignAction` 同样处理）。
+- `closed` 状态需要 DB 迁移：旧库未跑 `migration-2026-06-21-add-closed-status.sql` 前，把工单改成
+  Closed 会被旧 check 约束拒绝。
 - ~~Server Actions 是公开 endpoint：依赖客户端校验和 TS 类型，仍需补 runtime validation / 长度限制 / transition 校验~~：已在 Hardening 阶段补齐（`src/lib/validation.ts`，决策 D11）。
 - ~~`insertActivity()` 没有检查后续 `tickets.updated_at` 更新错误~~：已在 Hardening 阶段加上 `{ error }` 检查并抛错。
 - Dashboard 当前把完整 ticket（email/description/activities）传给 client。公开 demo 可接受；若以后有真实/私有数据，应改成轻量 list DTO。
+- `docs/handoff.md` 仍有旧描述（"目前无登录"），下一轮文档收尾时要同步。
 - ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
 - ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
 - `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），

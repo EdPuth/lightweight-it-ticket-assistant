@@ -18,6 +18,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   in_progress: 'In Progress',
   waiting: 'Waiting',
   resolved: 'Resolved',
+  closed: 'Closed',
 };
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {
@@ -50,6 +51,7 @@ export const STATUS_DOT_CLASS: Record<TicketStatus, string> = {
   in_progress: 'bg-amber-500',
   waiting: 'bg-gray-400',
   resolved: 'bg-emerald-500',
+  closed: 'bg-slate-600',
 };
 
 export const PRIORITY_DOT_CLASS: Record<TicketPriority, string> = {
@@ -65,7 +67,11 @@ export const STATUS_ORDER: TicketStatus[] = [
   'in_progress',
   'waiting',
   'resolved',
+  'closed',
 ];
+
+// "活跃"状态：Dashboard 默认只显示这些；resolved / closed 需显式按状态筛选才出现。
+export const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'waiting'];
 
 export const PRIORITY_ORDER: TicketPriority[] = [
   'urgent',
@@ -150,6 +156,7 @@ export function countByStatus(tickets: Ticket[]): Record<TicketStatus, number> {
     in_progress: 0,
     waiting: 0,
     resolved: 0,
+    closed: 0,
   };
 
   for (const ticket of tickets) {

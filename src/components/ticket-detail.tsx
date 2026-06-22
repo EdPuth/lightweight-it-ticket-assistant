@@ -20,6 +20,7 @@ import { StatusBadge } from "./status-badge";
 import { PriorityBadge } from "./priority-badge";
 import { ActivityTimeline } from "./activity-timeline";
 import { AiSuggestedReply } from "./ai-suggested-reply";
+import { DeleteTicket } from "./delete-ticket";
 
 // 工单详情：状态切换 / 指派 / 备注 / 插入回复都通过 Server Actions 落库（持久化）。
 // DB 为唯一真相：操作后 revalidatePath 用最新数据重渲染本组件（props 更新）。
@@ -48,10 +49,9 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
 
   const handleStatusChange = (next: TicketStatus) => {
     if (next === optimisticStatus) return;
-    const prev = ticket.status;
     startTransition(() => {
       setOptimisticStatus(next);
-      return changeStatusAction(ticket.id, prev, next);
+      return changeStatusAction(ticket.id, next);
     });
   };
 
@@ -64,10 +64,9 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
 
   const handleAssigneeChange = (next: string) => {
     if (next === optimisticAssignee) return;
-    const prev = ticket.assignedTo ?? "";
     startTransition(() => {
       setOptimisticAssignee(next);
-      return assignAction(ticket.id, prev, next);
+      return assignAction(ticket.id, next);
     });
   };
 
@@ -205,6 +204,8 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           </div>
         </div>
       </section>
+
+      <DeleteTicket ticketId={ticket.id} />
     </main>
   );
 }

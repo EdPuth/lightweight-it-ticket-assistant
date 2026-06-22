@@ -16,7 +16,7 @@ create table tickets (
   requester_email text not null,
   category text not null check (category in ('email','network','hardware','software','access','other')),
   priority text not null check (priority in ('low','medium','high','urgent')),
-  status text not null check (status in ('open','in_progress','waiting','resolved')),
+  status text not null check (status in ('open','in_progress','waiting','resolved','closed')),
   description text not null,
   assigned_to text,
   created_at timestamptz not null default now(),

@@ -15,11 +15,14 @@ two-agent development workflow.
   (`itsupport@outlook.com` / `123456`). Credentials are checked server-side; a successful
   login sets an httpOnly session cookie and `src/proxy.ts` redirects unauthenticated
   visitors to `/login`. Sign out clears the session.
-- **Dashboard** (`/`) — status stat cards (Open / In Progress / Waiting / Resolved) that
-  double as a status filter, plus search and a priority filter over a sorted ticket list.
+- **Dashboard** (`/`) — status stat cards (Open / In Progress / Waiting / Resolved / Closed)
+  that double as a status filter, plus search and a priority filter over a sorted ticket list.
+  By default the list shows **active tickets only** (Open / In Progress / Waiting); Resolved
+  and Closed tickets are hidden until you click their status card.
 - **Ticket detail** (`/tickets/[id]`) — full ticket view, requester metadata, description,
-  activity timeline, **change status**, **assign a technician**, and **add an internal
-  note**. Invalid ids show a friendly "ticket not found" state.
+  activity timeline, **change status** (incl. Closed), **assign a technician**, **add an
+  internal note**, and **delete the ticket** (confirm-gated danger action; activities cascade).
+  Invalid ids show a friendly "ticket not found" state.
 - **Create ticket** (`/tickets/new`) — controlled form (requester, email, title, category,
   priority, description) with inline validation; successful submissions are persisted to
   Supabase and redirect to the new ticket detail page.
@@ -66,9 +69,15 @@ npm run build    # production build (the gate before each commit)
 
 Deployed on Vercel (imports this GitHub repo). Set `SUPABASE_URL` and
 `SUPABASE_SERVICE_ROLE_KEY` as Vercel environment variables (no `NEXT_PUBLIC_`
-prefix). See `docs/db-setup.md`. The app is gated behind a single shared login
-(optionally override `AUTH_EMAIL` / `AUTH_PASSWORD` / `AUTH_SESSION_TOKEN` via env);
-this is a practice gate, not per-user auth — fine for a demo, not for real data.
+prefix). See `docs/db-setup.md`. The app is gated behind a single shared login;
+**production requires `AUTH_SESSION_TOKEN`** (a long random string) or it will
+refuse to start — the dev fallback token is public in the source. You may also
+override `AUTH_EMAIL` / `AUTH_PASSWORD`. This is a practice gate, not per-user
+auth — fine for a demo, not for real data.
+
+> Upgrading an existing database: run `supabase/migration-2026-06-21-add-closed-status.sql`
+> in the Supabase SQL Editor once so the `closed` status is allowed (re-running the full
+> `schema.sql` would drop your data).
 
 ## Project structure
 
