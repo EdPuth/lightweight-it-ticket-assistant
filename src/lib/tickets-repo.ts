@@ -78,46 +78,32 @@ export async function listTickets(
     ticketsQuery.eq("requester_user_id", opts.ownerUserId);
   }
 
-  const [{ data: tickets, error: tErr }, { data: activities, error: aErr }] =
-    await Promise.all([
-      ticketsQuery,
-      sb.from("activities").select("*").order("created_at", { ascending: true }),
-    ]);
-
+  const { data: tickets, error: tErr } = await ticketsQuery;
   if (tErr) throw new Error(`Failed to load tickets: ${tErr.message}`);
-  if (aErr) throw new Error(`Failed to load activities: ${aErr.message}`);
 
-  const byTicket = new Map<string, ActivityRow[]>();
-  for (const a of (activities ?? []) as ActivityRow[]) {
-    const list = byTicket.get(a.ticket_id) ?? [];
-    list.push(a);
-    byTicket.set(a.ticket_id, list);
-  }
-
-  return ((tickets ?? []) as TicketRow[]).map((t) =>
-    mapTicket(t, byTicket.get(t.id) ?? []),
-  );
+  // The dashboard list (ticket cards) doesn't render activity timelines, so we
+  // skip fetching activities here — one fewer query and a smaller client payload.
+  return ((tickets ?? []) as TicketRow[]).map((t) => mapTicket(t, []));
 }
 
 /** Fetch a single ticket with its activities, or null if not found. */
 export async function getTicketById(id: string): Promise<Ticket | null> {
   const sb = getSupabaseAdmin();
 
-  const { data: ticket, error: tErr } = await sb
-    .from("tickets")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // Fetch the ticket and its activities in parallel (one round-trip instead of
+  // two sequential ones). If the ticket is missing, the activities are ignored.
+  const [{ data: ticket, error: tErr }, { data: activities, error: aErr }] =
+    await Promise.all([
+      sb.from("tickets").select("*").eq("id", id).maybeSingle(),
+      sb
+        .from("activities")
+        .select("*")
+        .eq("ticket_id", id)
+        .order("created_at", { ascending: true }),
+    ]);
 
   if (tErr) throw new Error(`Failed to load ticket: ${tErr.message}`);
   if (!ticket) return null;
-
-  const { data: activities, error: aErr } = await sb
-    .from("activities")
-    .select("*")
-    .eq("ticket_id", id)
-    .order("created_at", { ascending: true });
-
   if (aErr) throw new Error(`Failed to load activities: ${aErr.message}`);
 
   return mapTicket(ticket as TicketRow, (activities ?? []) as ActivityRow[]);
