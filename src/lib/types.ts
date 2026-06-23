@@ -20,6 +20,16 @@ export type TicketCategory =
 
 export type TicketActivityType = 'created' | 'status_changed' | 'note' | 'reply';
 
+// RBAC: fixed roles for v1.
+export type UserRole = 'employee' | 'it_support' | 'admin';
+
+export type Profile = {
+  id: string; // Supabase auth.users id (uuid)
+  email: string;
+  displayName: string;
+  role: UserRole;
+};
+
 export type TicketActivity = {
   id: string;
   type: TicketActivityType;
@@ -40,6 +50,7 @@ export type Ticket = {
   createdAt: string; // ISO 8601 字符串
   updatedAt: string; // ISO 8601 字符串
   assignedTo?: string;
+  requesterUserId?: string; // owning auth user (RBAC); undefined for legacy rows
   activities: TicketActivity[];
 };
 

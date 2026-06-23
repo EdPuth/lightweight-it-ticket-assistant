@@ -17,6 +17,7 @@
 | DB Ext 2 | 读迁移：Dashboard/详情读 DB | 列表/详情从 Supabase 读出 | ✅ 完成 |
 | DB Ext 3 | 写迁移：Server Actions 落库 | 创建/改状态/备注/指派/插入回复持久化 | ✅ 完成 |
 | DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ✅ 完成 |
+| RBAC Auth v1 | 多账号登录 + Employee / IT Support / Admin 权限 | 不同角色看到/能做的操作符合权限矩阵；RLS/服务端校验不只靠 UI 隐藏 | ⏭️ 下一步 |
 
 ---
 
@@ -103,39 +104,67 @@
   - **运维待办（需 Owner）**：① Supabase 跑 `supabase/migration-2026-06-21-add-closed-status.sql`
     才允许 `closed`；② Vercel 设 `AUTH_SESSION_TOKEN` 否则生产运行时抛错。
 
+- **RBAC Auth v1 — Supabase Auth + 三角色（决策 D14，Owner 开新 scope）**
+  - 认证换成 **Supabase Auth + `@supabase/ssr`**（新增依赖 + env `SUPABASE_ANON_KEY`）；删除原单账号
+    `auth.ts` 常量与 `session.ts`。`login/actions.ts` 改用 `signInWithPassword`/`signOut`；
+    `proxy.ts` 改用 Supabase session 门禁（无 anon key 时 fail-closed 跳 `/login`）。
+  - DB：`profiles`（id→auth.users + role check）+ `tickets.requester_user_id` + 索引；
+    `supabase/migration-2026-06-23-rbac.sql`（非破坏）+ `schema.sql` 同步。
+  - 角色 helper（`auth.ts` 重写）：`getCurrentUserProfile` / `requireProfile` / `requireRole` /
+    `canViewTicket` / `canProcessTickets` / `canDeleteTickets`。
+  - 数据/动作按矩阵强制（服务端）：employee 只看/建自己的（`listTickets({ownerUserId})` + 详情
+    `canViewTicket` 越权当 not-found + create stamp `requester_user_id`）；status/assign/note/reply
+    限 it_support+admin；delete 限 admin。**UI 按角色隐藏控件（详情页 `canProcess`/`canDelete`），
+    但安全靠服务端不靠隐藏。**
+  - 种子：`scripts/seed-users.ts`（建 admin/support/employee 三账号 + 回填旧工单给 employee）。
+  - `npm run lint` / `npm run build` 通过；本地 smoke：无 anon key 时 `/`→`/login`（fail-closed）、
+    `/login` 200、登录页渲染正常、无 console 报错。**完整三角色验证需 Owner 先做下方运维步骤。**
+  - **运维待办（需 Owner，按顺序）**：① 本地 `.env.local` + Vercel 加 `SUPABASE_ANON_KEY`；
+    ② Supabase SQL Editor 跑 `migration-2026-06-23-rbac.sql`；③ `node --env-file=.env.local
+    scripts/seed-users.ts` 建账号 + 回填；④ 确认 Supabase 启用 Email 登录（默认开）。
+
 ## Next（下一步）
-- **Database Extension 全部完成**：本地 + 线上都连同一个 Supabase 库，读写持久化。
-- DB 阶段 Codex review 已完成；练习项目可以继续使用，但不要放真实数据。
-- 已加**全站登录门禁**（单账号，决策 D12）：应用层收口了"公开无登录写入"，但仍非 per-user auth / RLS。
-- 真正"生产化"的下一步（需 Owner 开新 scope）：**Supabase Auth + RLS policies + anon key**（替换单账号门禁）。
-- ~~短期修补：Server Actions runtime validation + `insertActivity()` 检查 `updated_at` 更新错误~~：
-  已完成（见 Completed 的 Hardening 条目 + 决策 D11）。**部署前需把改动 push 到 Vercel 才会生效。**
-- ~~先修登录门禁风险，再做 delete~~：已完成（决策 D13）——生产强制 `AUTH_SESSION_TOKEN`、
-  `requireSession()` 进所有写 Action、`.env.example` 已补说明。
-- ~~Owner 需求 — ticket lifecycle + delete~~：已完成（决策 D13）——`closed` 状态、Dashboard
-  active-only 默认、resolved/closed 走状态卡片、详情页 confirm-gated hard delete（cascade）。
-- **本阶段后的运维待办（需 Owner 操作，否则功能不完整）：**
-  - Supabase SQL Editor 跑 `supabase/migration-2026-06-21-add-closed-status.sql`（否则改 Closed 报错）。
-  - Vercel 设强随机 `AUTH_SESSION_TOKEN` 环境变量（否则生产部署运行时抛错）。
-- Dashboard 仍把完整 ticket 下发到 client（Codex DB review [P3]）：公开 demo 可接受；接真实/私有数据前再做轻量 list DTO。
-- 之后可再接关键词搜索 / 邮箱知识库（扩展点已就绪，见决策 D8）。
+- **当前状态**：MVP、Supabase 持久化、Vercel 部署、单账号登录门禁、runtime validation、
+  `closed` 生命周期、active-only Dashboard、详情页删除功能都已完成并通过 Codex review。
+- **Owner 运维待办（如果还没做）**：
+  - Supabase SQL Editor 跑 `supabase/migration-2026-06-21-add-closed-status.sql`，否则改 Closed 会被旧约束拒绝。
+  - Vercel 设强随机 `AUTH_SESSION_TOKEN`，否则生产运行时会抛错。
+- ~~下一阶段：RBAC Auth v1（多账号 + 角色权限）~~ **已完成（决策 D14）**：Supabase Auth +
+  `@supabase/ssr`、`profiles`/`requester_user_id`、服务端角色强制（employee 只看/建自己的；
+  support/admin 处理全部；仅 admin 删除）、UI 按角色隐藏、`scripts/seed-users.ts` 种 3 账号。
+- **RBAC 运维待办（需 Owner，按顺序，否则登录/角色不可用）**：
+  - 本地 `.env.local` + Vercel 三处都加 `SUPABASE_ANON_KEY`。
+  - Supabase SQL Editor 跑 `supabase/migration-2026-06-23-rbac.sql`。
+  - `node --env-file=.env.local scripts/seed-users.ts` 建账号 + 回填旧工单。
+  - 确认 Supabase 启用 Email 登录（默认开）。
+- **RBAC 紧随的 follow-up（建议下一阶段）**：加 **Supabase RLS policies**（employee 只能 select/insert
+  自己的、support/admin 全部、仅 admin delete、activity 可见性跟随 ticket），把强制从应用层下沉到
+  数据库层；为 `requester_user_id` 等 policy 列加索引（已加），`auth.uid()` 用 `select` 包裹。
+- **再之后**：Email Intake、轻量 list DTO、关键词搜索、知识库、真实 AI。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
 - Tailwind v4：CSS-first 配置（`@import "tailwindcss"` + `@theme`），无 `tailwind.config.js`。
 - 范围蔓延风险：MVP + DB extension 已完成；后续不要顺手扩成企业级 helpdesk，除非 Owner 明确开新 scope。
 - README 已在 DB review 中更新为 Supabase persistence + Vercel deployment；后续如果扩 scope，需要同步维护。
-- ~~公开无登录 + 持久化写入~~：已加全站登录门禁（单账号，D12），应用层收口。**但仍是单账号共享凭据 + service-role 写**，不是 per-user auth / RLS；真实数据仍必须先做 Supabase Auth + RLS。
+- ~~公开无登录 / 单账号共享凭据~~：已升级为 **RBAC Auth v1**（Supabase Auth + 三角色，D14）。
+- **RBAC 仍是应用层强制 + service-role 写**（非数据库 RLS）：若直接拿 service-role key 或绕过应用层
+  仍可越权读写。真实/私有数据前必须加 RLS policies（follow-up）。UI 隐藏不是权限边界，已在服务端强制。
+- `@supabase/ssr` 是第二个运行时依赖（D14）：升级 Supabase 时需一并验证 SSR cookie 行为。
 - ~~默认 session token 可伪造~~：已修（D13）——生产强制 `AUTH_SESSION_TOKEN`，缺失即抛错；
   dev 回退 token 仅本地用。**注意：Vercel 必须设置该环境变量，否则生产运行时报错。**
 - ~~Server Actions 缺 action-level session check~~：已修（D13）——所有写 Action 开头 `requireSession()`。
 - ~~`changeStatusAction()` 信任客户端 `prev`~~：已修（D13）——服务端从 DB 读当前状态（`assignAction` 同样处理）。
 - `closed` 状态需要 DB 迁移：旧库未跑 `migration-2026-06-21-add-closed-status.sql` 前，把工单改成
   Closed 会被旧 check 约束拒绝。
+- RBAC 不能只靠前端隐藏按钮：Server Actions / repo / RLS 都必须按角色检查权限。
+- 当前 repo 仍大量使用 service-role admin client；做 RBAC 时要避免继续用它绕过 RLS 来服务普通用户请求。
+- Employee ticket 隔离需要 DB 字段支持，不能只用 `requester_email` 过滤；邮箱可变且容易伪造。
+- 做 RLS policy 时，`tickets.requester_user_id`、`profiles.role` 等 policy 相关列要有索引，避免后续性能问题。
+- 迁移真实库前要先备份/确认 seed 数据归属：旧 ticket 没有 `requester_user_id`，需要给历史数据指定 owner 或允许 support/admin 可见。
+- `docs/handoff.md` 仍需压缩/同步：里面还有较早 DB review 的已修风险，下一轮文档收尾可清理。
 - ~~Server Actions 是公开 endpoint：依赖客户端校验和 TS 类型，仍需补 runtime validation / 长度限制 / transition 校验~~：已在 Hardening 阶段补齐（`src/lib/validation.ts`，决策 D11）。
 - ~~`insertActivity()` 没有检查后续 `tickets.updated_at` 更新错误~~：已在 Hardening 阶段加上 `{ error }` 检查并抛错。
-- Dashboard 当前把完整 ticket（email/description/activities）传给 client。公开 demo 可接受；若以后有真实/私有数据，应改成轻量 list DTO。
-- `docs/handoff.md` 仍有旧描述（"目前无登录"），下一轮文档收尾时要同步。
 - ~~starter `layout.tsx` / `page.tsx`~~：已在 Phase 2 替换为项目真实 metadata 与 Dashboard 首页。
 - ~~少数 mock activity 跳过中间状态~~：已在 Phase 3 为 TKT-1005/1007/1008 补齐 open→in_progress。
 - `formatRelativeTime()` 默认使用 `Date.now()`；当前页面用 `formatDateTime()`（确定性 UTC 输出），
@@ -151,7 +180,8 @@
 
 ## 后续扩展方向（不在 MVP 内）
 - ~~加入 Supabase 存储真实 tickets~~：DB Extension 已完成。
-- 登录与角色权限：employee / IT support / admin（建议作为下一个生产化 scope）。
+- ~~登录与角色权限：employee / IT support / admin（建议作为下一个生产化 scope）~~：已升级为下一阶段 RBAC Auth v1。
+- 邮件入站生成 ticket：暂缓，等 RBAC/Auth 稳定后再做。
 - 接入真实 AI API 生成回复、分类和优先级建议。
 - ~~部署到 Vercel~~：DB Ext Step 4 已完成。
 - **（Owner 提出）关键词搜索以往 ticket**：technician 用 Outlook / email 等关键词找到历史相关工单。

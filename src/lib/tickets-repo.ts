@@ -17,6 +17,7 @@ type TicketRow = {
   title: string;
   requester_name: string;
   requester_email: string;
+  requester_user_id: string | null;
   category: TicketCategory;
   priority: TicketPriority;
   status: TicketStatus;
@@ -56,19 +57,30 @@ function mapTicket(row: TicketRow, activities: ActivityRow[]): Ticket {
     status: row.status,
     description: row.description,
     assignedTo: row.assigned_to ?? undefined,
+    requesterUserId: row.requester_user_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     activities: activities.map(mapActivity),
   };
 }
 
-/** Fetch all tickets with their activities (timeline order). */
-export async function listTickets(): Promise<Ticket[]> {
+/**
+ * Fetch tickets with their activities (timeline order). Pass `ownerUserId` to
+ * restrict to one requester (employee view); omit it for support/admin (all).
+ */
+export async function listTickets(
+  opts: { ownerUserId?: string } = {},
+): Promise<Ticket[]> {
   const sb = getSupabaseAdmin();
+
+  const ticketsQuery = sb.from("tickets").select("*");
+  if (opts.ownerUserId) {
+    ticketsQuery.eq("requester_user_id", opts.ownerUserId);
+  }
 
   const [{ data: tickets, error: tErr }, { data: activities, error: aErr }] =
     await Promise.all([
-      sb.from("tickets").select("*"),
+      ticketsQuery,
       sb.from("activities").select("*").order("created_at", { ascending: true }),
     ]);
 
@@ -141,6 +153,7 @@ export type NewTicketInput = {
   title: string;
   requesterName: string;
   requesterEmail: string;
+  requesterUserId?: string | null;
   category: TicketCategory;
   priority: TicketPriority;
   status: TicketStatus;
@@ -157,6 +170,7 @@ export async function insertTicket(input: NewTicketInput): Promise<string> {
       title: input.title,
       requester_name: input.requesterName,
       requester_email: input.requesterEmail,
+      requester_user_id: input.requesterUserId ?? null,
       category: input.category,
       priority: input.priority,
       status: input.status,

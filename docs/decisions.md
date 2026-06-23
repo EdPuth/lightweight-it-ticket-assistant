@@ -170,3 +170,70 @@
   - Vercel 生产环境**必须**设 `AUTH_SESSION_TOKEN`（强随机），否则部署后运行时会抛错。可选设
     `AUTH_EMAIL` / `AUTH_PASSWORD`。`.env.example` 已补说明。
 - **仍未做（后续 scope）**：per-user auth / RLS（替换单账号门禁）；Dashboard list DTO（[P3]）。
+
+## D14 — 下一阶段改为 RBAC Auth v1（多账号 + Employee / IT Support / Admin）
+- **背景**：Owner 决定暂缓 Email Intake，下一阶段先实现多个不同账户登录系统的权限模型。当前单账号
+  cookie 门禁只能证明"登录后可见"，不能表达"谁能看哪些 ticket / 谁能删除"。
+- **决定**：
+  - 下一阶段命名为 **RBAC Auth v1**。
+  - 用 Supabase Auth 替换当前单账号共享 cookie demo；建议按 Supabase SSR 文档使用官方
+    `@supabase/ssr` helper 处理 Next.js Server Components / Server Actions 的 cookie session。
+  - 角色固定为 `employee` / `it_support` / `admin`，v1 不做自定义角色管理 UI。
+  - 新增 app 侧 profile/role 表（例如 `profiles`），不要直接修改 `auth.users` 存业务字段。
+  - 给 `tickets` 增加稳定 owner 字段（例如 `requester_user_id uuid references auth.users(id)`）；
+    `requester_name` / `requester_email` 只作为展示字段，不作为权限边界。
+- **权限矩阵**：
+  - Employee：只能创建自己的 ticket；只能看自己创建的 ticket、状态、IT 回复；不能改状态、指派、备注、
+    回复或删除。
+  - IT Support：能看全部 ticket；能创建 ticket、回复、加内部备注、指派、改状态；不能删除。
+  - Admin：能看全部 ticket；拥有所有操作，包括删除。
+- **实现原则**：
+  - 先做服务端权限检查和数据过滤，再做 UI 隐藏/禁用。UI 不是权限边界。
+  - Server Actions 必须逐个按角色检查；不能只依赖页面是否渲染按钮。
+  - 当前 `SUPABASE_SERVICE_ROLE_KEY` 会绕过 RLS。RBAC 阶段要么迁到用户态 Supabase client + RLS，
+    要么在继续使用 service-role 的地方补显式 server-side role check；长期方向是 Supabase Auth + RLS。
+  - RLS policy 相关列需要索引，例如 `tickets.requester_user_id`。
+- **暂不做**：Email Intake、团队/部门、多租户、邀请 flow、自定义角色管理、附件、审计日志系统。
+
+## D14 — RBAC Auth v1：Supabase Auth + 三角色 + 应用层强制（Owner 开新 scope）
+- **背景**：Owner 决定把单账号门禁升级为多账号 + 角色权限（见 `docs/project-brief.md`、Codex
+  「Scope Change — RBAC Auth v1 Planning」）。角色固定：`employee` / `it_support` / `admin`。
+- **Owner 拍板的四个关键选择**：
+  1. **认证机制 = Supabase Auth + `@supabase/ssr`**（替换原单账号 cookie 门禁；新增官方小依赖）。
+  2. **权限强制 = 应用层先行**：每个 Server Action / Server Component 做 `requireRole` + 所有权
+     检查，数据访问仍用 service-role；**RLS policies 作为紧随其后的 follow-up**（Codex 明确允许
+     "service-role + 显式服务端角色检查"）。
+  3. **账号 = 种 3 个固定测试账号**（每角色一个），v1 不做注册页。
+  4. **旧工单 = 全部回填给种子 employee**（`requester_user_id`），让 employee 视角有数据。
+- **权限矩阵**（来自 Codex / project-brief）：employee = 只看/建自己的工单（不能处理）；
+  it_support = 看/处理全部（不能删）；admin = 全部含删除。
+- **架构**：
+  - 依赖：新增 `@supabase/ssr`（D9 之外的第二个运行时依赖；理由：App Router 下安全管理 auth
+    cookie 的官方方案）。新增 env `SUPABASE_ANON_KEY`（auth 客户端用，非 service-role）。
+  - DB：`profiles`（id→auth.users、email、display_name、role check）+ `tickets.requester_user_id`
+    （→auth.users，加索引）。RLS 仍开启无 public policy（follow-up 再加 policies）。
+  - 客户端分层：`src/lib/supabase/auth-server.ts`（`@supabase/ssr` 的 cookie-aware server client，
+    仅管 auth）；`src/lib/supabase/server.ts` service-role 仍管数据。
+  - 角色 helper（`src/lib/auth.ts` 重写）：`getCurrentUserProfile` / `requireProfile` /
+    `requireRole(...roles)` / `canViewTicket` / `canMutateTicket`。
+  - 登录：`login/actions.ts` 改用 `auth.signInWithPassword` / `signOut`；`proxy.ts` 改用 Supabase
+    session（`auth.getUser`）判断登录态。删除旧的单账号常量/`session.ts`。
+  - 数据/动作：`listTickets` 按角色过滤（employee 只看自己）；详情页 `canViewTicket` 把越权当
+     not-found；`createTicketAction` 服务端 stamp `requester_user_id`（任何角色）；
+     status/assign/note/reply 限 `it_support`+`admin`；delete 限 `admin`。**UI 最后改**：按角色隐藏控件，
+     但**安全靠服务端，不靠 UI 隐藏**（Codex P1）。
+  - 种子：`scripts/seed-users.ts`（service-role admin API 建 3 用户 + profiles + 回填旧工单）。
+- **替代方案**：自建多账号（不引入 Supabase Auth，自己哈希密码）——更轻但要自管密码、不够"真实"，
+  Owner 选了 Supabase Auth。直接上 RLS——更安全但本阶段更重，放 follow-up。
+- **运维待办（需 Owner）**：跑 `supabase/migration-2026-06-23-rbac.sql`；本地/Vercel 加
+  `SUPABASE_ANON_KEY`；跑 `node --env-file=.env.local scripts/seed-users.ts` 建账号 + 回填。
+  Supabase 需启用 Email 登录（默认开）。
+- **暂不做**：注册/邀请流、密码重置定制、角色管理 UI、teams/departments、RLS policies（紧随的 follow-up）、
+  额外审计日志、support/admin 代他人建单（v1 requester = 当前登录用户）。
+
+### D14 补充（测试反馈修复）
+- **登录失败保留 email**：`loginAction` 失败时回传输入的 email，登录框用 `defaultValue` 显示
+  （React 19 表单 action 后会重置非受控输入；密码不回传所以清空）。只需重输密码。
+- **员工隔离演示**：员工账号从 1 个改为 3 个（tom/jerry/mia）。`scripts/seed-users.ts` 把现有工单
+  round-robin 分给三人，并把每条工单的 requester 署名改为对应员工。这样登录 tom 只看到 tom 的工单
+  （此前"看到全部"并非权限 bug——过滤逻辑正确，只是种子把所有旧工单都回填给了单一 employee）。

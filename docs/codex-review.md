@@ -122,3 +122,131 @@
    - keep `resolved` and `closed` visible through explicit status filtering;
    - update counts/empty states so the hidden default is obvious.
 4. Add delete only from the detail page as a clearly separated danger action with confirmation; use a Server Action that validates/authenticates, deletes the ticket, relies on `activities.ticket_id ... on delete cascade`, revalidates `/`, and redirects to the Dashboard.
+
+### Lifecycle + Delete + Email Intake Planning
+- 状态：✅ Reviewed by Codex on 2026-06-22
+
+#### Summary
+- Claude Code addressed the previous security review before adding destructive mutations: production now requires `AUTH_SESSION_TOKEN`, all mutating Server Actions call `requireSession()`, and status/assignee timeline text now reads the current DB row instead of trusting client-provided previous values.
+- The new `closed` status is wired through TypeScript, labels, ordering, Dashboard counts, SQL schema, and a non-destructive Supabase migration.
+- Delete is intentionally placed on the detail page as a separate danger action with a confirm step. The implementation relies on the existing `activities.ticket_id ... on delete cascade`, which is appropriate for this practice app.
+- MVP scope is still controlled. The app has grown beyond the original mock-only MVP, but the current code remains beginner-readable and does not add unnecessary dependencies.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Source review ✅
+  - `src/app/actions.ts`
+  - `src/lib/auth.ts`
+  - `src/lib/session.ts`
+  - `src/lib/tickets-repo.ts`
+  - `src/lib/types.ts`
+  - `src/lib/ticket-utils.ts`
+  - `src/components/dashboard-client.tsx`
+  - `src/components/ticket-detail.tsx`
+  - `src/components/delete-ticket.tsx`
+  - `supabase/migration-2026-06-21-add-closed-status.sql`
+
+#### Findings
+- **P2 — Email intake should not use the personal inbox as the first implementation.** Connecting a personal Gmail/Outlook account means OAuth scopes, mailbox privacy, duplicate handling, and accidental ingestion risks. For the practice MVP, use a dedicated test inbox/address such as `support@...` or `ticket-test@...`; if a personal mailbox must be used, only process mail sent to a dedicated alias/label and never scan the whole inbox.
+- **P2 — Inbound email endpoint must use webhook authentication, not the login session.** A future `/api/email/inbound` route will be called by an email provider, not a signed-in browser. It should validate a provider signature or shared secret header such as `INBOUND_EMAIL_WEBHOOK_SECRET`, then apply the same server-side length/category/priority defaults before inserting a ticket.
+- **P3 — `docs/handoff.md` is stale.** It still describes older DB-review risks as open and does not clearly include the completed D13 lifecycle/delete work. This is not a runtime issue, but it can slow down the next agent.
+- **P3 — Dashboard still sends full ticket objects to the client.** This remains acceptable for the practice/demo phase. Before ingesting real emails with private descriptions, create a lightweight dashboard DTO so list rows do not ship full descriptions, requester emails, and activity history unnecessarily.
+- **P3 — `deleteTicket()` does not distinguish “already deleted / not found” from success.** Supabase delete without returning rows is fine for the normal UI path, but a direct call for a missing id silently succeeds. If Claude wants tighter feedback, change it to return/select the deleted `id` and throw on not found. Not blocking.
+- **P3 — Empty state copy can be more precise when all active tickets are hidden.** If every ticket is `resolved` or `closed`, the default active-only list shows “No tickets yet” even though archived tickets exist. A small prop such as `hiddenCount` would let it say “No active tickets” instead.
+
+#### Next Actions For Claude Code
+1. Start the next scope as **Email Intake v1**, not a general mailbox sync project.
+2. Prefer webhook-based inbound email if the Owner has a domain or can create a test support address:
+   - provider receives email;
+   - provider posts parsed fields to `POST /api/email/inbound`;
+   - route validates `INBOUND_EMAIL_WEBHOOK_SECRET`;
+   - route inserts an `open` ticket with safe defaults;
+   - route records a `created` activity like `Ticket created from inbound email.`
+3. Keep v1 small:
+   - no attachments;
+   - no outbound email replies;
+   - no threading/reopening existing tickets;
+   - no personal inbox scan;
+   - no new heavy dependency unless parsing the selected provider payload truly requires it.
+4. Add minimal DB support for dedupe and source tracking:
+   - add `source` to tickets or a small `inbound_emails` table;
+   - store provider/message id with a unique constraint;
+   - store sender, subject, received time, and resulting ticket id.
+5. Update stale docs after implementation:
+   - `docs/handoff.md`;
+   - `docs/project-brief.md` if email intake becomes part of the active learning scope.
+
+#### Email Intake References
+- SendGrid Inbound Parse webhook: https://www.twilio.com/docs/sendgrid/for-developers/parsing-email/setting-up-the-inbound-parse-webhook
+- Mailgun inbound routes / route actions: https://documentation.mailgun.com/docs/mailgun/user-manual/receive-forward-store/receive-http
+- Gmail API push notifications require Google Cloud Pub/Sub + mailbox watch: https://developers.google.com/workspace/gmail/api/guides/push
+- Microsoft Graph mail change notifications use subscriptions/webhooks: https://learn.microsoft.com/en-us/graph/change-notifications-overview
+
+### Scope Change — RBAC Auth v1 Planning
+- 状态：📌 Planned by Owner / Codex on 2026-06-23
+
+#### Owner Decision
+- Email Intake is postponed.
+- The next stage is multi-account authentication and role-based permissions.
+- Roles are fixed for v1: `employee`, `it_support`, `admin`.
+
+#### Target Permission Matrix
+| Capability | Employee | IT Support | Admin |
+|---|---:|---:|---:|
+| Sign in | ✅ | ✅ | ✅ |
+| Create ticket | ✅ own ticket | ✅ | ✅ |
+| See dashboard/list | Own tickets only | All tickets | All tickets |
+| See ticket detail | Own tickets only | All tickets | All tickets |
+| See ticket status / IT replies | Own tickets only | All tickets | All tickets |
+| Add internal note | ❌ | ✅ | ✅ |
+| Insert/reply to ticket | ❌ | ✅ | ✅ |
+| Change status | ❌ | ✅ | ✅ |
+| Assign technician | ❌ | ✅ | ✅ |
+| Delete ticket | ❌ | ❌ | ✅ |
+
+#### Recommended Implementation Shape
+- Use Supabase Auth for real users instead of extending the current single shared cookie system. Supabase's current server-side auth docs recommend cookie-aware SSR clients via `@supabase/ssr`; this is a small official helper, not a UI/framework dependency.
+- Add an app-owned profile/role table instead of modifying `auth.users` directly:
+  - `profiles.id uuid primary key references auth.users(id)`;
+  - `profiles.email text not null`;
+  - `profiles.display_name text not null`;
+  - `profiles.role text not null check (role in ('employee','it_support','admin'))`.
+- Add ticket ownership:
+  - `tickets.requester_user_id uuid references auth.users(id)`;
+  - keep `requester_name` / `requester_email` as denormalized display fields.
+- Create small server helpers before changing UI:
+  - `getCurrentUserProfile()`;
+  - `requireRole(...allowedRoles)`;
+  - `canViewTicket(profile, ticket)`;
+  - `canMutateTicket(profile, action, ticket)`.
+- Move access rules into Server Components / Server Actions first, then hide or disable UI controls based on role.
+- For database safety, add RLS policies as part of this scope or as a tightly coupled follow-up:
+  - Employees can select/insert their own tickets.
+  - IT Support/Admin can select/update all tickets.
+  - Only Admin can delete tickets.
+  - Activity visibility follows ticket visibility.
+- Keep v1 small: no invite flow, no password reset customization, no custom role management UI, no teams/departments, no audit log beyond the existing activity timeline.
+
+#### Review Risks To Watch
+- **P1 — Do not rely only on UI hiding.** If an Employee cannot delete in the UI but can call `deleteTicketAction()` directly, the permission model is broken. Every Server Action must enforce role permissions.
+- **P1 — Avoid service-role bypass for user-scoped reads/writes.** The current repo uses `SUPABASE_SERVICE_ROLE_KEY`, which bypasses RLS. RBAC should either use user-scoped Supabase clients for normal app access or pair service-role calls with explicit server-side role checks. Prefer moving toward anon/authenticated + RLS where practical.
+- **P2 — Do not use `requester_email` as the security boundary.** Employee isolation needs `requester_user_id = auth.uid()` or an equivalent immutable user id. Email is display data.
+- **P2 — Seed/migrate old tickets deliberately.** Existing tickets have no owner. Decide whether to assign them to a demo employee, leave them visible only to support/admin, or backfill based on seeded requester emails.
+- **P2 — RLS policy performance matters.** Add indexes for columns used in policies, especially `tickets.requester_user_id` and any FK/role lookups. Wrap functions like `auth.uid()` with `select` in policies when appropriate.
+
+#### Next Actions For Claude Code
+1. Draft a short RBAC implementation plan before coding, including schema migration, auth/session changes, and permission matrix.
+2. Add Supabase Auth SSR plumbing and replace the current single-account `auth.ts` flow.
+3. Add profile/role and ticket owner schema migrations; include seed/test account instructions.
+4. Update repo read functions so Employee gets only own tickets while support/admin get all.
+5. Update every mutating Server Action with role checks:
+   - create: all roles;
+   - status/assign/note/reply: `it_support` + `admin`;
+   - delete: `admin` only.
+6. Update UI last: show role-aware dashboard/detail controls without redesigning the whole app.
+7. Run `npm run lint`, `npm run build`, and browser smoke tests for all three roles.
+
+#### References
+- Supabase SSR Auth docs: https://supabase.com/docs/guides/auth/server-side/creating-a-client
+- Supabase RLS docs: https://supabase.com/docs/guides/database/postgres/row-level-security

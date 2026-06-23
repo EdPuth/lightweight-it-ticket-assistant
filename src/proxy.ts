@@ -1,40 +1,70 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE, isValidSession } from "@/lib/auth";
+import { createServerClient } from "@supabase/ssr";
 
-// Next.js 16: "Middleware" is now called Proxy (same functionality). This gates
-// the whole app behind login — unauthenticated visitors are redirected to
-// /login, and signed-in users are kept off the login page.
-//
-// Server Action POSTs target the page's own path, so the login form (on /login)
-// and the logout action (on an authed page) both pass this check naturally.
+// Next.js 16: "Middleware" is now called Proxy. This gates the app behind a
+// Supabase Auth session and refreshes session cookies on each request (the
+// official @supabase/ssr pattern). Authorization (roles) is enforced in Server
+// Actions / Server Components — this only checks "is there a signed-in user".
 
 const PUBLIC_PATHS = ["/login"];
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
+
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  // If auth isn't configured, fail closed: send everything to /login.
+  if (!url || !anonKey) {
+    const isLogin = request.nextUrl.pathname === "/login";
+    if (isLogin) return response;
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        response = NextResponse.next({ request });
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set(name, value, options);
+        }
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { pathname } = request.nextUrl;
-  const authed = isValidSession(request.cookies.get(SESSION_COOKIE)?.value);
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 
-  if (!authed && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  if (!user && !isPublic) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    return NextResponse.redirect(redirectUrl);
   }
 
-  if (authed && isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+  if (user && isPublic) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/";
+    return NextResponse.redirect(redirectUrl);
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-  // Run on everything except Next internals and static asset files.
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],

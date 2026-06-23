@@ -25,7 +25,15 @@ import { DeleteTicket } from "./delete-ticket";
 // 工单详情：状态切换 / 指派 / 备注 / 插入回复都通过 Server Actions 落库（持久化）。
 // DB 为唯一真相：操作后 revalidatePath 用最新数据重渲染本组件（props 更新）。
 // 状态/指派的 select 用 useOptimistic 即时反映选择，事务完成后自动对齐回 DB 真值。
-export function TicketDetail({ ticket }: { ticket: Ticket }) {
+export function TicketDetail({
+  ticket,
+  canProcess,
+  canDelete,
+}: {
+  ticket: Ticket;
+  canProcess: boolean;
+  canDelete: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
   const [noteDraft, setNoteDraft] = useState("");
 
@@ -118,6 +126,7 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
         </div>
       </section>
 
+      {canProcess ? (
       <section className="mt-6 grid gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">
         <div className="flex items-center justify-between gap-3">
           <label
@@ -166,8 +175,11 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
           </select>
         </div>
       </section>
+      ) : null}
 
-      <AiSuggestedReply ticket={ticket} onInsert={handleInsertReply} />
+      {canProcess ? (
+        <AiSuggestedReply ticket={ticket} onInsert={handleInsertReply} />
+      ) : null}
 
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">
@@ -180,32 +192,34 @@ export function TicketDetail({ ticket }: { ticket: Ticket }) {
         </div>
         <ActivityTimeline activities={ticket.activities} />
 
-        <div className="mt-5">
-          <label htmlFor="note-input" className="sr-only">
-            Add an internal note
-          </label>
-          <textarea
-            id="note-input"
-            value={noteDraft}
-            onChange={(event) => setNoteDraft(event.target.value)}
-            rows={3}
-            placeholder="Add an internal note…"
-            className="w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
-          />
-          <div className="mt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={handleAddNote}
-              disabled={!noteDraft.trim() || isPending}
-              className="ticket-card rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-            >
-              Add note
-            </button>
+        {canProcess ? (
+          <div className="mt-5">
+            <label htmlFor="note-input" className="sr-only">
+              Add an internal note
+            </label>
+            <textarea
+              id="note-input"
+              value={noteDraft}
+              onChange={(event) => setNoteDraft(event.target.value)}
+              rows={3}
+              placeholder="Add an internal note…"
+              className="w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            />
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleAddNote}
+                disabled={!noteDraft.trim() || isPending}
+                className="ticket-card rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              >
+                Add note
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </section>
 
-      <DeleteTicket ticketId={ticket.id} />
+      {canDelete ? <DeleteTicket ticketId={ticket.id} /> : null}
     </main>
   );
 }

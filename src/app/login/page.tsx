@@ -51,10 +51,14 @@ export default function LoginPage() {
           <LoginForm />
         </div>
 
-        {/* Demo credentials hint — this is a practice project with one fixed account. */}
+        {/* Demo credentials hint — practice project with seeded role accounts. */}
         <p className="mt-5 text-center text-xs leading-relaxed text-faint">
-          Demo access · <span className="font-mono">itsupport@outlook.com</span>{" "}
-          / <span className="font-mono">123456</span>
+          Demo accounts · <span className="font-mono">admin@example.com</span> ·{" "}
+          <span className="font-mono">support@example.com</span> ·{" "}
+          <span className="font-mono">tom@example.com</span>
+          <br />
+          password is the name + <span className="font-mono">123</span> (e.g.{" "}
+          <span className="font-mono">tom123</span>)
         </p>
       </section>
     </main>

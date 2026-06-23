@@ -1,44 +1,34 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  SESSION_COOKIE,
-  SESSION_MAX_AGE,
-  SESSION_TOKEN,
-  verifyCredentials,
-} from "@/lib/auth";
+import { getSupabaseAuth } from "@/lib/supabase/auth-server";
 
-export type LoginState = { error?: string };
+// `email` is echoed back so the form can keep it filled after a failed attempt
+// (React resets uncontrolled fields after a form action; the email input reads
+// this via defaultValue, while the password field intentionally clears).
+export type LoginState = { error?: string; email?: string };
 
-// Verify the single allowed account, set an httpOnly session cookie, then go to
-// the dashboard. On failure, return an error for the form to display.
+// Sign in with Supabase Auth. On success the auth client writes the session
+// cookies; redirect to the dashboard. On failure, return an error for the form.
 export async function loginAction(
   _prev: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!verifyCredentials(email, password)) {
-    return { error: "Incorrect email or password." };
+  const supabase = await getSupabaseAuth();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    return { error: "Incorrect email or password.", email };
   }
-
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, SESSION_TOKEN, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
 
   redirect("/");
 }
 
-// Clear the session and return to the login page.
+// Clear the Supabase session and return to the login page.
 export async function logoutAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
+  const supabase = await getSupabaseAuth();
+  await supabase.auth.signOut();
   redirect("/login");
 }

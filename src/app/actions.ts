@@ -9,7 +9,7 @@ import {
   insertTicket,
   updateTicketFields,
 } from "@/lib/tickets-repo";
-import { requireSession } from "@/lib/session";
+import { requireProfile, requireRole } from "@/lib/auth";
 import { STATUS_LABELS } from "@/lib/ticket-utils";
 import {
   validateAssignee,
@@ -20,8 +20,6 @@ import {
 } from "@/lib/validation";
 import type { TicketCategory, TicketPriority } from "@/lib/types";
 
-const AUTHOR = "IT Support";
-
 export type CreateTicketInput = {
   requesterName: string;
   requesterEmail: string;
@@ -31,15 +29,21 @@ export type CreateTicketInput = {
   description: string;
 };
 
-// Create a ticket, log a "created" activity, then go to its detail page.
+// Create a ticket owned by the current user, log a "created" activity, then go
+// to its detail page. Any signed-in role may create (employees create own).
 export async function createTicketAction(input: CreateTicketInput) {
-  await requireSession();
+  const profile = await requireProfile();
   // Server Actions are public endpoints: validate before trusting the input.
   const data = validateCreateTicketInput(input);
-  const id = await insertTicket({ ...data, status: "open" });
+  const id = await insertTicket({
+    ...data,
+    status: "open",
+    // Ownership is stamped from the session, never the client.
+    requesterUserId: profile.id,
+  });
   await insertActivity(id, {
     type: "created",
-    author: data.requesterName,
+    author: profile.displayName,
     content: "Ticket created.",
   });
   revalidatePath("/");
@@ -49,7 +53,7 @@ export async function createTicketAction(input: CreateTicketInput) {
 // `next` is the only value trusted from the client. The previous status is read
 // from the DB so the timeline copy can't be faked by a direct caller.
 export async function changeStatusAction(ticketId: string, next: string) {
-  await requireSession();
+  const profile = await requireRole("it_support", "admin");
   const id = validateTicketId(ticketId);
   const to = validateStatus(next, "Status");
 
@@ -60,7 +64,7 @@ export async function changeStatusAction(ticketId: string, next: string) {
   await updateTicketFields(id, { status: to });
   await insertActivity(id, {
     type: "status_changed",
-    author: AUTHOR,
+    author: profile.displayName,
     content: `Status changed from ${STATUS_LABELS[current.status]} to ${STATUS_LABELS[to]}.`,
   });
   revalidatePath("/");
@@ -68,7 +72,7 @@ export async function changeStatusAction(ticketId: string, next: string) {
 }
 
 export async function assignAction(ticketId: string, next: string) {
-  await requireSession();
+  const profile = await requireRole("it_support", "admin");
   const id = validateTicketId(ticketId);
   const to = validateAssignee(next);
 
@@ -79,7 +83,7 @@ export async function assignAction(ticketId: string, next: string) {
   await updateTicketFields(id, { assignedTo: to || null });
   await insertActivity(id, {
     type: "note",
-    author: AUTHOR,
+    author: profile.displayName,
     content: to ? `Assigned to ${to}.` : "Unassigned.",
   });
   revalidatePath("/");
@@ -87,32 +91,33 @@ export async function assignAction(ticketId: string, next: string) {
 }
 
 export async function addNoteAction(ticketId: string, content: string) {
-  await requireSession();
+  const profile = await requireRole("it_support", "admin");
   const id = validateTicketId(ticketId);
   const trimmed = validateNoteContent(content, "Note");
   await insertActivity(id, {
     type: "note",
-    author: AUTHOR,
+    author: profile.displayName,
     content: trimmed,
   });
   revalidatePath(`/tickets/${id}`);
 }
 
 export async function insertReplyAction(ticketId: string, content: string) {
-  await requireSession();
+  const profile = await requireRole("it_support", "admin");
   const id = validateTicketId(ticketId);
   const trimmed = validateNoteContent(content, "Reply");
   await insertActivity(id, {
     type: "reply",
-    author: AUTHOR,
+    author: profile.displayName,
     content: trimmed,
   });
   revalidatePath(`/tickets/${id}`);
 }
 
 // Permanently delete a ticket (activities cascade) and return to the dashboard.
+// Admin only.
 export async function deleteTicketAction(ticketId: string) {
-  await requireSession();
+  await requireRole("admin");
   const id = validateTicketId(ticketId);
   await deleteTicket(id);
   revalidatePath("/");

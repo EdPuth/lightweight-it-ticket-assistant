@@ -4,7 +4,17 @@
 
 drop table if exists activities;
 drop table if exists tickets;
+drop table if exists profiles;
 drop sequence if exists ticket_seq;
+
+-- RBAC: one profile row per Supabase Auth user, holding role + display fields.
+create table profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  email text not null,
+  display_name text not null,
+  role text not null check (role in ('employee','it_support','admin')),
+  created_at timestamptz not null default now()
+);
 
 -- Sequence for human-friendly ticket ids like TKT-1014.
 create sequence ticket_seq start with 1014;
@@ -14,6 +24,7 @@ create table tickets (
   title text not null,
   requester_name text not null,
   requester_email text not null,
+  requester_user_id uuid references auth.users (id),
   category text not null check (category in ('email','network','hardware','software','access','other')),
   priority text not null check (priority in ('low','medium','high','urgent')),
   status text not null check (status in ('open','in_progress','waiting','resolved','closed')),
@@ -22,6 +33,8 @@ create table tickets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create index tickets_requester_user_id_idx on tickets (requester_user_id);
 
 create table activities (
   id uuid primary key default gen_random_uuid(),
@@ -38,5 +51,6 @@ create index activities_created_at_idx on activities (created_at);
 -- Enable Row Level Security with NO public policies. All access in this app
 -- goes through the server using the service_role key, which bypasses RLS.
 -- The anon/public key therefore cannot read or write anything.
+alter table profiles enable row level security;
 alter table tickets enable row level security;
 alter table activities enable row level security;

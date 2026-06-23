@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTicketById } from "@/lib/tickets-repo";
+import {
+  canDeleteTickets,
+  canProcessTickets,
+  canViewTicket,
+  getCurrentUserProfile,
+} from "@/lib/auth";
 import { TicketDetail } from "@/components/ticket-detail";
 
 // Next.js 16：App Router 的 params 是 Promise，必须 await。
@@ -25,13 +32,25 @@ export async function generateMetadata({
 
 export default async function TicketDetailPage({ params }: TicketPageProps) {
   const { id } = await params;
+
+  const profile = await getCurrentUserProfile();
+  if (!profile) redirect("/login");
+
   const ticket = await getTicketById(id);
 
-  if (!ticket) {
+  // Employees may only see their own tickets. Treat anything they can't view as
+  // not-found so the page doesn't leak the existence of other users' tickets.
+  if (!ticket || !canViewTicket(profile, ticket)) {
     return <TicketNotFound id={id} />;
   }
 
-  return <TicketDetail ticket={ticket} />;
+  return (
+    <TicketDetail
+      ticket={ticket}
+      canProcess={canProcessTickets(profile)}
+      canDelete={canDeleteTickets(profile)}
+    />
+  );
 }
 
 // 无效 id 的友好提示，而不是直接落到默认 404。

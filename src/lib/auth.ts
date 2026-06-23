@@ -1,52 +1,76 @@
-// Practice-grade auth: a single hardcoded account gates the whole app.
-//
-// This is intentionally NOT production authentication. There is one shared
-// credential, the session cookie holds a fixed opaque token (not a per-user
-// signed session), and there is no password hashing or user identity. The real
-// production path is still Supabase Auth + RLS (see docs/decisions.md D12 / D10).
-//
-// Everything here is read only on the server — in the login Server Action and in
-// src/proxy.ts — so the credentials and session token are never shipped to the
-// browser bundle. Values can be overridden via env vars for a deployed instance.
+import { getSupabaseAuth } from "./supabase/auth-server";
+import { getSupabaseAdmin } from "./supabase/server";
+import type { Profile, UserRole } from "./types";
 
-const AUTH_EMAIL = process.env.AUTH_EMAIL ?? "itsupport@outlook.com";
-const AUTH_PASSWORD = process.env.AUTH_PASSWORD ?? "123456";
+// RBAC helpers (server-only). Authentication is handled by Supabase Auth via the
+// cookie-aware client; the role/profile lives in the app-owned `profiles` table.
+// Data access uses the service-role key, so EVERY mutating Server Action and
+// data-scoped read must call these checks — never rely on UI hiding alone.
 
-/** Name of the session cookie set on successful login. */
-export const SESSION_COOKIE = "ticket_session";
+/** The signed-in user's profile (id + role + display fields), or null. */
+export async function getCurrentUserProfile(): Promise<Profile | null> {
+  const supabase = await getSupabaseAuth();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
-// Dev-only fallback token. It is NOT usable in production: resolveSessionToken()
-// throws if AUTH_SESSION_TOKEN is unset in production, so the public default can
-// never be used to forge a session on a deployed instance.
-const DEV_SESSION_TOKEN = "itsa.session.v1.dev-only";
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id, email, display_name, role")
+    .eq("id", user.id)
+    .maybeSingle();
 
-function resolveSessionToken(): string {
-  const fromEnv = process.env.AUTH_SESSION_TOKEN;
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "AUTH_SESSION_TOKEN must be set in production. Refusing to start with a " +
-        "publicly-known default session token (it would be trivially forgeable).",
-    );
+  if (error) throw new Error(`Failed to load profile: ${error.message}`);
+  if (!data) return null;
+
+  const row = data as {
+    id: string;
+    email: string;
+    display_name: string;
+    role: UserRole;
+  };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    role: row.role,
+  };
+}
+
+/** Require a signed-in user with a profile, or throw. */
+export async function requireProfile(): Promise<Profile> {
+  const profile = await getCurrentUserProfile();
+  if (!profile) throw new Error("Unauthorized: sign in required.");
+  return profile;
+}
+
+/** Require the signed-in user to have one of the given roles, or throw. */
+export async function requireRole(...roles: UserRole[]): Promise<Profile> {
+  const profile = await requireProfile();
+  if (!roles.includes(profile.role)) {
+    throw new Error("Forbidden: insufficient permissions.");
   }
-  return DEV_SESSION_TOKEN;
+  return profile;
 }
 
-/** Opaque value stored in the session cookie. Required via env in production. */
-export const SESSION_TOKEN = resolveSessionToken();
-
-/** Session lifetime in seconds (8 hours). */
-export const SESSION_MAX_AGE = 60 * 60 * 8;
-
-/** Verify the single allowed account. Email is case-insensitive. */
-export function verifyCredentials(email: string, password: string): boolean {
-  return (
-    email.trim().toLowerCase() === AUTH_EMAIL.toLowerCase() &&
-    password === AUTH_PASSWORD
-  );
+/** Employees may only view their own tickets; support/admin see all. */
+export function canViewTicket(
+  profile: Profile,
+  ticket: { requesterUserId?: string },
+): boolean {
+  if (profile.role === "it_support" || profile.role === "admin") return true;
+  return Boolean(ticket.requesterUserId) &&
+    ticket.requesterUserId === profile.id;
 }
 
-/** Whether a cookie value represents a valid signed-in session. */
-export function isValidSession(value: string | undefined): boolean {
-  return value === SESSION_TOKEN;
+/** Who may process a ticket (change status / assign / note / reply). */
+export function canProcessTickets(profile: Profile): boolean {
+  return profile.role === "it_support" || profile.role === "admin";
+}
+
+/** Who may delete a ticket. */
+export function canDeleteTickets(profile: Profile): boolean {
+  return profile.role === "admin";
 }

@@ -42,9 +42,11 @@
      写：Server Actions (app/actions.ts)，每个 revalidatePath；create 后 redirect
 ```
 安全模型：service_role key **仅服务端用、不加 `NEXT_PUBLIC_`**；RLS 开启但无 public policy
-（anon 进不来，service role 绕过）。**已加单账号登录门禁**（`src/proxy.ts` + `src/lib/auth.ts`，
-决策 D12/D13）：未登录跳 `/login`，写操作 Server Action 内部也 `requireSession()`。仍是单账号
-共享凭据、非 per-user auth/RLS；真实数据仍需先做 Supabase Auth + RLS。生产须设 `AUTH_SESSION_TOKEN`。
+（anon 进不来，service role 绕过）。**已升级为 RBAC Auth v1**（Supabase Auth + `@supabase/ssr`，
+决策 D14）：三角色 employee / it_support / admin，`src/proxy.ts` 门禁 + Server Actions/Components
+里 `requireRole` / `canViewTicket` 等服务端强制（UI 隐藏只是体验）。数据仍走 service-role + 应用层
+角色检查，**RLS policies 是紧随的 follow-up**。运维：`.env` 需 `SUPABASE_ANON_KEY`；跑
+`migration-2026-06-23-rbac.sql` + `scripts/seed-users.ts`（种 admin/support/employee 三账号）。
 
 ## 4. 关键 Next.js 16 注意点（容易踩坑）
 

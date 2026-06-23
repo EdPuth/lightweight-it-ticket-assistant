@@ -26,7 +26,8 @@ export function LoginForm() {
           type="email"
           autoComplete="username"
           required
-          placeholder="itsupport@outlook.com"
+          placeholder="you@example.com"
+          defaultValue={state.email ?? ""}
           aria-invalid={state.error ? true : undefined}
           className="rounded-xl border border-border bg-background/60 px-4 py-2.5 text-sm text-foreground placeholder:text-faint shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
         />

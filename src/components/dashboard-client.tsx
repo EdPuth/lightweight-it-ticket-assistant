@@ -10,7 +10,13 @@ import {
   STATUS_LABELS,
   STATUS_ORDER,
 } from "@/lib/ticket-utils";
-import type { PriorityFilter, StatusFilter, Ticket, TicketStatus } from "@/lib/types";
+import type {
+  PriorityFilter,
+  Profile,
+  StatusFilter,
+  Ticket,
+  TicketStatus,
+} from "@/lib/types";
 import { StatCard } from "@/components/stat-card";
 import { TicketFilters } from "@/components/ticket-filters";
 import { TicketList } from "@/components/ticket-list";
@@ -18,7 +24,19 @@ import { LogoutButton } from "@/components/logout-button";
 
 // Client dashboard: filtering/search/sort over the tickets fetched on the
 // server and passed in as a prop. No data fetching here.
-export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
+const ROLE_LABELS: Record<Profile["role"], string> = {
+  employee: "Employee",
+  it_support: "IT Support",
+  admin: "Admin",
+};
+
+export function DashboardClient({
+  tickets,
+  profile,
+}: {
+  tickets: Ticket[];
+  profile: Profile;
+}) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [query, setQuery] = useState("");
@@ -57,7 +75,10 @@ export function DashboardClient({ tickets }: { tickets: Ticket[] }) {
       <div className="mb-6 flex items-center justify-between text-xs text-faint">
         <span>
           Signed in as{" "}
-          <span className="font-mono text-muted">itsupport@outlook.com</span>
+          <span className="font-mono text-muted">{profile.email}</span>
+          <span className="ml-2 rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-medium text-foreground/70">
+            {ROLE_LABELS[profile.role]}
+          </span>
         </span>
         <LogoutButton />
       </div>

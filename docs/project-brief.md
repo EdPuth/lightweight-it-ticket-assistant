@@ -26,10 +26,18 @@ AI suggested reply 的草稿（mock）。
 | AI Suggested Reply | 根据描述生成 mock 回复草稿，可复制/插入 | 真实 LLM API、自动发送邮件 |
 | Project Docs | README、CLAUDE.md、AGENTS.md、docs/* | 复杂架构文档平台 |
 
+## 当前 Post-MVP 扩展目标
+
+下一阶段从单账号登录升级为 **RBAC Auth v1**：多个账号登录，并按角色限制数据可见性与操作权限。
+角色固定为 Employee、IT Support、Admin：
+- Employee 只能创建并查看自己的 ticket、处理状态和 IT 回复。
+- IT Support 可以查看和处理全部 ticket，但不能删除。
+- Admin 拥有全部权限，包括删除。
+
 ## 数据模型（来自文档 §5）
 
 ```ts
-type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved';
+type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
 type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
 type TicketCategory = 'email' | 'network' | 'hardware' | 'software' | 'access' | 'other';
 

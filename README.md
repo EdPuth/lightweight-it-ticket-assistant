@@ -11,10 +11,11 @@ two-agent development workflow.
 
 ## Features (implemented)
 
-- **Sign in** (`/login`) — the whole app is gated behind a single shared account
-  (`itsupport@outlook.com` / `123456`). Credentials are checked server-side; a successful
-  login sets an httpOnly session cookie and `src/proxy.ts` redirects unauthenticated
-  visitors to `/login`. Sign out clears the session.
+- **Sign in + roles (RBAC)** (`/login`) — multi-account auth via **Supabase Auth**. Three
+  fixed roles: **employee** (create + view only their own tickets), **it_support** (view and
+  process all tickets, no delete), **admin** (everything, incl. delete). `src/proxy.ts` gates
+  the app behind a session; roles are enforced in Server Actions / Server Components (not just
+  hidden in the UI). Test accounts are created by `scripts/seed-users.ts`.
 - **Dashboard** (`/`) — status stat cards (Open / In Progress / Waiting / Resolved / Closed)
   that double as a status filter, plus search and a priority filter over a sorted ticket list.
   By default the list shows **active tickets only** (Open / In Progress / Waiting); Resolved
@@ -39,9 +40,11 @@ Server Actions using a server-only service-role key.
 
 Still mock / out of scope:
 
-- **Single shared login, not real auth** — one hardcoded account gates the app, but there
-  are no per-user accounts, roles, or Supabase RLS policies; DB writes still use the
-  service-role key. Real production auth = Supabase Auth + RLS + anon key (future direction).
+- **No database-level RLS yet** — RBAC is enforced in the app layer (role checks in every
+  Server Action / Server Component) while data access still uses the service-role key. Adding
+  Supabase RLS policies is the planned tightly-coupled follow-up.
+- **No self-service signup** — v1 uses 3 seeded accounts; there's no registration, invite,
+  or password-reset flow.
 - **AI replies** are generated from **local templates** (`src/lib/reply-templates.ts`), not a
   real language model.
 
@@ -59,25 +62,37 @@ Requires a Supabase project and a `.env.local` — see `docs/db-setup.md`.
 
 ```bash
 npm install      # first time (already installed by the scaffold)
-cp .env.example .env.local   # then fill in SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env.local   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
 npm run dev      # http://localhost:3000
 npm run lint     # lint check
 npm run build    # production build (the gate before each commit)
 ```
 
+First-time RBAC setup (or when upgrading an existing DB):
+
+```bash
+# 1. In the Supabase SQL Editor, run the RBAC migration once:
+#    supabase/migration-2026-06-23-rbac.sql   (profiles + tickets.requester_user_id)
+# 2. Create the 3 test accounts + backfill ownerless tickets:
+node --env-file=.env.local scripts/seed-users.ts
+```
+
+Seeded test accounts (password = first name + `123`): `admin@example.com`,
+`support@example.com`, and three employees `tom@example.com`, `jerry@example.com`,
+`mia@example.com`. The seed script round-robins existing tickets across the three
+employees so each only sees their own (employee isolation demo).
+
 ## Deployment
 
-Deployed on Vercel (imports this GitHub repo). Set `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY` as Vercel environment variables (no `NEXT_PUBLIC_`
-prefix). See `docs/db-setup.md`. The app is gated behind a single shared login;
-**production requires `AUTH_SESSION_TOKEN`** (a long random string) or it will
-refuse to start — the dev fallback token is public in the source. You may also
-override `AUTH_EMAIL` / `AUTH_PASSWORD`. This is a practice gate, not per-user
-auth — fine for a demo, not for real data.
+Deployed on Vercel (imports this GitHub repo). Set `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` as Vercel environment
+variables (no `NEXT_PUBLIC_` prefix). See `docs/db-setup.md`. Make sure Email
+auth is enabled in Supabase, the RBAC migration has been run, and the seed
+script has created the accounts. RBAC is enforced in the app layer; database RLS
+policies are a planned follow-up, so this is still a demo, not for real data.
 
-> Upgrading an existing database: run `supabase/migration-2026-06-21-add-closed-status.sql`
-> in the Supabase SQL Editor once so the `closed` status is allowed (re-running the full
-> `schema.sql` would drop your data).
+> Earlier `closed`-status migration (if not already applied):
+> `supabase/migration-2026-06-21-add-closed-status.sql`.
 
 ## Project structure
 
