@@ -22,9 +22,13 @@ export async function generateMetadata({
   params,
 }: TicketPageProps): Promise<Metadata> {
   const { id } = await params;
-  const ticket = await getTicketById(id);
+  // Only reveal the real title to a viewer allowed to see this ticket, otherwise
+  // the page metadata would leak another user's ticket title to an Employee.
+  const profile = await getCurrentUserProfile();
+  const ticket = profile ? await getTicketById(id) : null;
+  const canView = profile && ticket && canViewTicket(profile, ticket);
   return {
-    title: ticket
+    title: canView
       ? `${ticket.title} · ${ticket.id}`
       : "Ticket not found · Ticket Assistant",
   };

@@ -28,11 +28,17 @@ AI suggested reply 的草稿（mock）。
 
 ## 当前 Post-MVP 扩展目标
 
-下一阶段从单账号登录升级为 **RBAC Auth v1**：多个账号登录，并按角色限制数据可见性与操作权限。
+已从单账号登录升级为 **RBAC Auth v1**：多个账号登录，并按角色限制数据可见性与操作权限。
 角色固定为 Employee、IT Support、Admin：
 - Employee 只能创建并查看自己的 ticket、处理状态和 IT 回复。
 - IT Support 可以查看和处理全部 ticket，但不能删除。
 - Admin 拥有全部权限，包括删除。
+
+下一阶段目标是 **AI API v1**：用 server-only API key 生成建议回复、分类建议和优先级建议。
+AI 建议只给 IT Support / Admin 使用，并且只作为 suggestion，不自动修改 ticket。
+
+AI API 后的目标是 Admin / IT Support 可见的 FAQ / Knowledge Base，用于沉淀常见 ticket 问题和
+解决步骤，并保持数据结构灵活，方便未来被搜索或作为 AI 上下文。
 
 ## 数据模型（来自文档 §5）
 

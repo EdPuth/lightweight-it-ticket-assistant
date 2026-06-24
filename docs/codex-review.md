@@ -250,3 +250,59 @@
 #### References
 - Supabase SSR Auth docs: https://supabase.com/docs/guides/auth/server-side/creating-a-client
 - Supabase RLS docs: https://supabase.com/docs/guides/database/postgres/row-level-security
+
+### RBAC Auth v1 — Supabase Auth + Roles Review
+- 状态：✅ Reviewed by Codex on 2026-06-23
+
+#### Summary
+- RBAC v1 is a solid step up from the previous single shared login. Supabase Auth handles real sessions, `profiles.role` holds the app role, and the main Server Actions enforce the role matrix server-side.
+- Employee isolation uses `tickets.requester_user_id`, not email, which is the right security boundary.
+- IT Support/Admin processing and Admin-only delete are enforced in Server Actions, not just hidden in the UI.
+- The performance cleanup is sensible: dashboard rows no longer fetch activities, which also reduces client payload.
+- This is still application-layer authorization with service-role DB access. That is acceptable for this practice stage, but RLS remains the next security hardening step before real/private data.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Source review ✅
+  - `src/lib/auth.ts`
+  - `src/lib/supabase/auth-server.ts`
+  - `src/proxy.ts`
+  - `src/app/actions.ts`
+  - `src/app/page.tsx`
+  - `src/app/tickets/[id]/page.tsx`
+  - `src/app/tickets/new/page.tsx`
+  - `src/lib/tickets-repo.ts`
+  - `src/components/dashboard-client.tsx`
+  - `src/components/ticket-detail.tsx`
+  - `supabase/migration-2026-06-23-rbac.sql`
+  - `scripts/seed-users.ts`
+
+#### Findings
+- **P2 — Detail page metadata can leak another user's ticket title.** `src/app/tickets/[id]/page.tsx:21-30` calls `getTicketById()` inside `generateMetadata()` and returns the real ticket title before doing the `canViewTicket()` check used by the page body. An Employee who opens someone else's ticket URL should see a generic "Ticket not found" title, not the hidden ticket's title in browser metadata. Fix by either making metadata generic for all ticket detail pages or loading `getCurrentUserProfile()` and applying `canViewTicket()` before returning a specific title.
+- **P2 — RLS is still not implemented.** The app now has strong application-layer role checks, but all data access still uses the service-role client, which bypasses database RLS. This is acceptable for the practice app, but any move toward real data should add Supabase RLS policies for `tickets`, `activities`, and `profiles`.
+- **P3 — Employee create form still asks for requester name/email.** `createTicketAction()` correctly stamps `requesterUserId` from the session, so this is not a security bug. But for Employee UX, the form can imply they are creating a ticket for someone else. Prefer pre-filling and locking requester name/email for Employee, while allowing support/admin to create on behalf of someone if that becomes an explicit requirement.
+- **P3 — `deleteTicket()` still silently succeeds on a missing id.** This is not new and not blocking. If tightening admin behavior, make delete return/select the deleted id and throw a not-found error when no row was deleted.
+- **P3 — Docs still mention some old single-login/env details.** README is mostly updated, but `docs/handoff.md` and older review sections are stale. A short docs cleanup pass after the next feature would help Claude read less historical noise.
+
+#### Next Actions For Claude Code
+1. Fix the P2 metadata leak before starting AI work.
+2. Keep RLS as the next security follow-up, but Owner has chosen to proceed with AI API v1 first for testing. Do not put real/private tickets into the system until RLS is done.
+3. Implement **AI API v1** as a narrow, server-only integration:
+   - API key only in server env, never client-side;
+   - one provider adapter module, so the Owner can test with their own API and swap providers later;
+   - Server Action or Route Handler that only `it_support` / `admin` can call;
+   - preserve the existing local template fallback when the API fails or env is missing;
+   - return structured data for reply draft, category suggestion, priority suggestion, and confidence/reasoning.
+4. For category/priority suggestions, require enum-safe output:
+   - category must be one of `email | network | hardware | software | access | other`;
+   - priority must be one of `low | medium | high | urgent`;
+   - invalid model output must be rejected or normalized server-side before touching UI/state.
+5. Keep the future FAQ / knowledge base flexible:
+   - do not hard-code FAQ copy inside components;
+   - evolve `solutionTemplates` or create a small `knowledge-base` data module/table;
+   - design AI prompts so they can later include relevant FAQ entries as context.
+
+#### AI API References
+- OpenAI text generation docs: https://developers.openai.com/api/docs/guides/text
+- OpenAI structured outputs docs: https://developers.openai.com/api/docs/guides/structured-outputs

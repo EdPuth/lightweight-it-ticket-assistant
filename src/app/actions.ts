@@ -4,17 +4,24 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   deleteTicket,
+  getTicketById,
   getTicketFields,
   insertActivity,
   insertTicket,
   updateTicketFields,
 } from "@/lib/tickets-repo";
 import { requireProfile, requireRole } from "@/lib/auth";
-import { STATUS_LABELS } from "@/lib/ticket-utils";
+import {
+  generateTicketSuggestion,
+  type TicketSuggestion,
+} from "@/lib/ai/suggest";
+import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from "@/lib/ticket-utils";
 import {
   validateAssignee,
+  validateCategory,
   validateCreateTicketInput,
   validateNoteContent,
+  validatePriority,
   validateStatus,
   validateTicketId,
 } from "@/lib/validation";
@@ -122,4 +129,47 @@ export async function deleteTicketAction(ticketId: string) {
   await deleteTicket(id);
   revalidatePath("/");
   redirect("/");
+}
+
+// Generate an AI reply draft + category/priority suggestions for a ticket.
+// Staff only; read-only (nothing is persisted until the user applies it).
+export async function generateSuggestionAction(
+  ticketId: string,
+): Promise<TicketSuggestion> {
+  await requireRole("it_support", "admin");
+  const id = validateTicketId(ticketId);
+  const ticket = await getTicketById(id);
+  if (!ticket) throw new Error("Ticket not found.");
+  return generateTicketSuggestion(ticket);
+}
+
+// Apply an AI-suggested priority and/or category to the ticket. Staff only;
+// enum-validated server-side and logged to the timeline.
+export async function applySuggestionAction(
+  ticketId: string,
+  fields: { priority?: string; category?: string },
+) {
+  const profile = await requireRole("it_support", "admin");
+  const id = validateTicketId(ticketId);
+
+  const patch: { priority?: TicketPriority; category?: TicketCategory } = {};
+  const parts: string[] = [];
+  if (fields.priority !== undefined) {
+    patch.priority = validatePriority(fields.priority);
+    parts.push(`priority → ${PRIORITY_LABELS[patch.priority]}`);
+  }
+  if (fields.category !== undefined) {
+    patch.category = validateCategory(fields.category);
+    parts.push(`category → ${CATEGORY_LABELS[patch.category]}`);
+  }
+  if (parts.length === 0) return;
+
+  await updateTicketFields(id, patch);
+  await insertActivity(id, {
+    type: "note",
+    author: profile.displayName,
+    content: `Applied AI suggestion: ${parts.join(", ")}.`,
+  });
+  revalidatePath("/");
+  revalidatePath(`/tickets/${id}`);
 }

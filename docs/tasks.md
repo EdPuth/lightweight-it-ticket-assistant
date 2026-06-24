@@ -17,7 +17,8 @@
 | DB Ext 2 | 读迁移：Dashboard/详情读 DB | 列表/详情从 Supabase 读出 | ✅ 完成 |
 | DB Ext 3 | 写迁移：Server Actions 落库 | 创建/改状态/备注/指派/插入回复持久化 | ✅ 完成 |
 | DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ✅ 完成 |
-| RBAC Auth v1 | 多账号登录 + Employee / IT Support / Admin 权限 | 不同角色看到/能做的操作符合权限矩阵；RLS/服务端校验不只靠 UI 隐藏 | ⏭️ 下一步 |
+| RBAC Auth v1 | 多账号登录 + Employee / IT Support / Admin 权限 | 不同角色看到/能做的操作符合权限矩阵；服务端校验不只靠 UI 隐藏 | ✅ 完成 |
+| AI API v1 | 接入真实 API 生成回复、分类、优先级建议 | server-only API key；结构化输出；失败时可回退本地模板 | ⏭️ 下一步 |
 
 ---
 
@@ -123,12 +124,30 @@
     ② Supabase SQL Editor 跑 `migration-2026-06-23-rbac.sql`；③ `node --env-file=.env.local
     scripts/seed-users.ts` 建账号 + 回填；④ 确认 Supabase 启用 Email 登录（默认开）。
 
+- **AI API v1 — 真实 LLM 建议 + metadata 越权修复（决策 D15）**
+  - 先修 Codex P2：`generateMetadata` 改为先 `canViewTicket` 再返回标题（员工打开他人工单不再从浏览器
+    标题泄露），`getTicketById` 包 `cache()` 去重。
+  - 接入 **Claude（Vercel AI SDK：`ai` + `@ai-sdk/anthropic`）**：`src/lib/ai/provider.ts`（adapter，
+    可换 provider）+ `src/lib/ai/suggest.ts`（`generateObject` + `jsonSchema` 产结构化结果，enum 服务端
+    再校验，KB 模板作上下文，AI 未配置/失败回退本地模板）。
+  - Server Actions：`generateSuggestionAction`（staff-only 只读）+ `applySuggestionAction`（staff-only，
+    enum 校验后改 priority/category + 记 activity）；`updateTicketFields` 支持 priority/category；
+    `validation.ts` 加 `validatePriority`/`validateCategory`。
+  - UI：`ai-suggested-reply.tsx` 调真实 action，展示草稿 + 建议优先级/分类（一键 Apply）+ 理由 + 信心 +
+    来源徽标；密钥不进客户端。
+  - `npm run lint` / `npm run build` 通过；浏览器验证：metadata 越权（tom 开 jerry 的 TKT-1002 → 通用
+    "Ticket not found" 标题）、AI 面板 fallback（Local template 徽标 + 草稿 + 建议行 + 理由 + Apply），
+    无 console 报错。真实 AI 路径需 Owner 配 `ANTHROPIC_API_KEY` 才能测。
+  - **运维待办（需 Owner）**：本地 `.env.local` + Vercel 加 `ANTHROPIC_API_KEY`（不加则自动用本地模板兜底）。
+
 ## Next（下一步）
-- **当前状态**：MVP、Supabase 持久化、Vercel 部署、单账号登录门禁、runtime validation、
-  `closed` 生命周期、active-only Dashboard、详情页删除功能都已完成并通过 Codex review。
+- **当前状态**：MVP、Supabase 持久化、Vercel 部署、RBAC Auth v1（三角色）、runtime validation、
+  `closed` 生命周期、active-only Dashboard、删除、**AI API v1（真实 Claude 建议 + 本地兜底）** 均完成。
 - **Owner 运维待办（如果还没做）**：
-  - Supabase SQL Editor 跑 `supabase/migration-2026-06-21-add-closed-status.sql`，否则改 Closed 会被旧约束拒绝。
-  - Vercel 设强随机 `AUTH_SESSION_TOKEN`，否则生产运行时会抛错。
+  - Supabase SQL Editor 跑 `migration-2026-06-21-add-closed-status.sql` 与 `migration-2026-06-23-rbac.sql`。
+  - 跑 `node --env-file=.env.local scripts/seed-users.ts` 建账号 + 回填。
+  - Vercel 环境变量：`SUPABASE_ANON_KEY`（RBAC 必需）、`AUTH_SESSION_TOKEN`（已废弃，RBAC 后不再用）、
+    可选 `ANTHROPIC_API_KEY`（开真实 AI；不加则用本地模板兜底）。
 - ~~下一阶段：RBAC Auth v1（多账号 + 角色权限）~~ **已完成（决策 D14）**：Supabase Auth +
   `@supabase/ssr`、`profiles`/`requester_user_id`、服务端角色强制（employee 只看/建自己的；
   support/admin 处理全部；仅 admin 删除）、UI 按角色隐藏、`scripts/seed-users.ts` 种 3 账号。
@@ -137,10 +156,24 @@
   - Supabase SQL Editor 跑 `supabase/migration-2026-06-23-rbac.sql`。
   - `node --env-file=.env.local scripts/seed-users.ts` 建账号 + 回填旧工单。
   - 确认 Supabase 启用 Email 登录（默认开）。
-- **RBAC 紧随的 follow-up（建议下一阶段）**：加 **Supabase RLS policies**（employee 只能 select/insert
-  自己的、support/admin 全部、仅 admin delete、activity 可见性跟随 ticket），把强制从应用层下沉到
-  数据库层；为 `requester_user_id` 等 policy 列加索引（已加），`auth.uid()` 用 `select` 包裹。
-- **再之后**：Email Intake、轻量 list DTO、关键词搜索、知识库、真实 AI。
+- **Codex RBAC review 待修**：
+  - 先修 `src/app/tickets/[id]/page.tsx` 的 metadata 权限泄露：`generateMetadata()` 不能在未做
+    `canViewTicket()` 前返回隐藏 ticket 的真实 title。
+- **下一阶段：AI API v1（Owner 用自己的 API key 测试）**
+  - API key 只放 server env，例如 `AI_API_KEY` / `AI_API_BASE_URL` / `AI_MODEL`，不要暴露到 client。
+  - 加一层 provider adapter（例如 `src/lib/ai/provider.ts`），UI/业务代码不要直接依赖某个供应商 SDK。
+  - 只允许 `it_support` / `admin` 调用 AI 生成；Employee 只查看 IT 回复，不看到生成控件。
+  - 保留当前 `reply-templates.ts` 本地模板作为 fallback：API 未配置、失败、超时、返回无效结构时仍能生成 mock draft。
+  - 返回结构化结果：`replyDraft`、`suggestedCategory`、`suggestedPriority`、`confidence`、`reason`。
+  - `suggestedCategory` / `suggestedPriority` 必须做 enum 校验，不能直接信模型输出。
+  - v1 只做“建议”，不要自动改 ticket 分类/优先级；让 support/admin 手动确认应用。
+- **AI API 后的下一阶段：FAQ / Knowledge Base（Admin + IT Support）**
+  - 为常见 ticket 问题做可扩展 FAQ/解决方案模块，优先复用或演进 `solutionTemplates` 的数据形状。
+  - 页面只给 `admin` / `it_support` 看；Employee 暂不需要 FAQ 管理入口。
+  - 保持数据驱动，方便之后新增 FAQ、搜索、把 FAQ 作为 AI prompt context。
+  - 不要把 FAQ 文案硬编码在组件里；先用 TS data module，后续可迁移到 Supabase 表。
+- **安全 follow-up 仍保留**：Supabase RLS policies（employee 只能 select/insert 自己的、support/admin 全部、
+  仅 admin delete、activity 可见性跟随 ticket），在放真实/私有数据前必须做。
 
 ## Risks（风险 / 注意）
 - Next.js 16：App Router 的 `params` / `searchParams` 是 **Promise**，详情页需 `await`。
@@ -150,6 +183,11 @@
 - ~~公开无登录 / 单账号共享凭据~~：已升级为 **RBAC Auth v1**（Supabase Auth + 三角色，D14）。
 - **RBAC 仍是应用层强制 + service-role 写**（非数据库 RLS）：若直接拿 service-role key 或绕过应用层
   仍可越权读写。真实/私有数据前必须加 RLS policies（follow-up）。UI 隐藏不是权限边界，已在服务端强制。
+- Detail metadata 泄露风险：`generateMetadata()` 必须遵守与页面 body 相同的 `canViewTicket()` 规则，
+  否则 Employee 可能在 browser title/head 中看到别人的 ticket 标题。
+- AI API 风险：API key 绝不能放进 client bundle；所有 AI 调用必须走 Server Action / Route Handler。
+- AI 输出风险：模型建议的 category/priority 只能作为 suggestion，必须经过 enum 校验并由 support/admin 确认。
+- FAQ/Knowledge Base 范围风险：先做轻量、数据驱动的常见问题模块，不要扩成完整 CMS 或文档平台。
 - `@supabase/ssr` 是第二个运行时依赖（D14）：升级 Supabase 时需一并验证 SSR cookie 行为。
 - ~~默认 session token 可伪造~~：已修（D13）——生产强制 `AUTH_SESSION_TOKEN`，缺失即抛错；
   dev 回退 token 仅本地用。**注意：Vercel 必须设置该环境变量，否则生产运行时报错。**
@@ -182,7 +220,8 @@
 - ~~加入 Supabase 存储真实 tickets~~：DB Extension 已完成。
 - ~~登录与角色权限：employee / IT support / admin（建议作为下一个生产化 scope）~~：已升级为下一阶段 RBAC Auth v1。
 - 邮件入站生成 ticket：暂缓，等 RBAC/Auth 稳定后再做。
-- 接入真实 AI API 生成回复、分类和优先级建议。
+- ~~接入真实 AI API 生成回复、分类和优先级建议~~：已升级为下一阶段 AI API v1。
+- Admin / IT Support FAQ（常见 ticket 问题 / 知识库）：AI API v1 后做，保持 `solutionTemplates` 可演进。
 - ~~部署到 Vercel~~：DB Ext Step 4 已完成。
 - **（Owner 提出）关键词搜索以往 ticket**：technician 用 Outlook / email 等关键词找到历史相关工单。
   扩展点已就绪：复用 `reply-templates.ts` 的 `matchScore`，并让 `searchTickets` 也匹配 `description`。

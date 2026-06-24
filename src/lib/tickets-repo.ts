@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase/server";
 import type {
   Ticket,
@@ -87,7 +88,11 @@ export async function listTickets(
 }
 
 /** Fetch a single ticket with its activities, or null if not found. */
-export async function getTicketById(id: string): Promise<Ticket | null> {
+export const getTicketById = cache(_getTicketById);
+
+// Deduped per request via cache() above (the detail page reads it in both
+// generateMetadata and the page body).
+async function _getTicketById(id: string): Promise<Ticket | null> {
   const sb = getSupabaseAdmin();
 
   // Fetch the ticket and its activities in parallel (one round-trip instead of
@@ -198,7 +203,12 @@ export async function insertActivity(
 /** Update mutable ticket fields and bump updated_at. */
 export async function updateTicketFields(
   ticketId: string,
-  fields: { status?: TicketStatus; assignedTo?: string | null },
+  fields: {
+    status?: TicketStatus;
+    assignedTo?: string | null;
+    priority?: TicketPriority;
+    category?: TicketCategory;
+  },
 ): Promise<void> {
   const sb = getSupabaseAdmin();
   const patch: Record<string, unknown> = {
@@ -206,6 +216,8 @@ export async function updateTicketFields(
   };
   if (fields.status !== undefined) patch.status = fields.status;
   if (fields.assignedTo !== undefined) patch.assigned_to = fields.assignedTo;
+  if (fields.priority !== undefined) patch.priority = fields.priority;
+  if (fields.category !== undefined) patch.category = fields.category;
 
   const { error } = await sb.from("tickets").update(patch).eq("id", ticketId);
   if (error) throw new Error(`Failed to update ticket: ${error.message}`);

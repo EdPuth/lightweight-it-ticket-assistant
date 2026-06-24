@@ -27,9 +27,11 @@ two-agent development workflow.
 - **Create ticket** (`/tickets/new`) — controlled form (requester, email, title, category,
   priority, description) with inline validation; successful submissions are persisted to
   Supabase and redirect to the new ticket detail page.
-- **AI suggested reply** (mock) — on the detail page, generates a draft reply from a local
-  solution-template library (no real LLM). Copy it or insert it into the timeline as a
-  reply. Clearly labelled "Suggested draft — review before sending".
+- **AI suggested reply + triage** (staff only) — on the detail page, generates a reply draft
+  **and** suggested category/priority with reasoning, using **Claude via the Vercel AI SDK**
+  (server-only key). Staff can edit/copy/insert the draft and one-click **apply** the suggested
+  priority/category. Falls back to the local solution-template draft when `ANTHROPIC_API_KEY`
+  is unset or the call fails. Clearly labelled "Suggested draft — review before sending".
 
 ## Data & persistence
 
@@ -45,8 +47,8 @@ Still mock / out of scope:
   Supabase RLS policies is the planned tightly-coupled follow-up.
 - **No self-service signup** — v1 uses 3 seeded accounts; there's no registration, invite,
   or password-reset flow.
-- **AI replies** are generated from **local templates** (`src/lib/reply-templates.ts`), not a
-  real language model.
+- **AI replies** use a real model (Claude) when `ANTHROPIC_API_KEY` is set; otherwise they fall
+  back to **local templates** (`src/lib/reply-templates.ts`). The key is server-only.
 
 ## Tech stack
 
@@ -62,7 +64,7 @@ Requires a Supabase project and a `.env.local` — see `docs/db-setup.md`.
 
 ```bash
 npm install      # first time (already installed by the scaffold)
-cp .env.example .env.local   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
+cp .env.example .env.local   # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY (+ optional ANTHROPIC_API_KEY)
 npm run dev      # http://localhost:3000
 npm run lint     # lint check
 npm run build    # production build (the gate before each commit)

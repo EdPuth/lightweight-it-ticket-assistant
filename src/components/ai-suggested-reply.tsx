@@ -1,13 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { Ticket } from "@/lib/types";
-import { generateSuggestedReply } from "@/lib/reply-templates";
+import {
+  CATEGORY_LABELS,
+  PRIORITY_DOT_CLASS,
+  PRIORITY_LABELS,
+} from "@/lib/ticket-utils";
+import {
+  applySuggestionAction,
+  generateSuggestionAction,
+} from "@/app/actions";
 
-type ReplyState = "idle" | "loading" | "generated";
+type ReplyState = "idle" | "loading" | "generated" | "error";
+type Suggestion = Awaited<ReturnType<typeof generateSuggestionAction>>;
 
-// Mock "AI suggested reply": composes a draft from local solution templates
-// (no real LLM). Clearly labelled as a draft for the technician to review.
+// AI suggested reply + triage. Calls a staff-only Server Action that uses a real
+// model (Claude via the AI SDK), with a local-template fallback when AI is off.
+// The technician reviews the draft and can apply the suggested priority/category.
 export function AiSuggestedReply({
   ticket,
   onInsert,
@@ -16,21 +26,26 @@ export function AiSuggestedReply({
   onInsert: (content: string) => void;
 }) {
   const [state, setState] = useState<ReplyState>("idle");
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [draft, setDraft] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
   const [inserted, setInserted] = useState(false);
+  const [isApplying, startApply] = useTransition();
 
-  const generate = () => {
+  const generate = async () => {
     setState("loading");
     setCopyState("idle");
     setInserted(false);
-    // Simulate a short "thinking" delay so the loading state is visible.
-    window.setTimeout(() => {
-      setDraft(generateSuggestedReply(ticket));
+    try {
+      const result = await generateSuggestionAction(ticket.id);
+      setSuggestion(result);
+      setDraft(result.replyDraft);
       setState("generated");
-    }, 700);
+    } catch {
+      setState("error");
+    }
   };
 
   const copy = async () => {
@@ -39,7 +54,6 @@ export function AiSuggestedReply({
       setCopyState("copied");
       window.setTimeout(() => setCopyState("idle"), 1500);
     } catch {
-      // Surface the failure so the technician can copy manually instead.
       setCopyState("failed");
       window.setTimeout(() => setCopyState("idle"), 2500);
     }
@@ -50,29 +64,45 @@ export function AiSuggestedReply({
     setInserted(true);
   };
 
+  const priorityMatches = suggestion?.suggestedPriority === ticket.priority;
+  const categoryMatches = suggestion?.suggestedCategory === ticket.category;
+
   return (
     <section className="mt-8 rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-foreground">
           AI suggested reply
         </h2>
-        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700">
-          Suggested draft — review before sending
-        </span>
+        <div className="flex items-center gap-2">
+          {suggestion ? (
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                suggestion.source === "ai"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-black/[0.05] text-muted"
+              }`}
+            >
+              {suggestion.source === "ai" ? "AI" : "Local template"}
+            </span>
+          ) : null}
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+            Suggested draft — review before sending
+          </span>
+        </div>
       </div>
 
       {state === "idle" ? (
         <div className="mt-3">
           <p className="text-sm text-muted">
-            Generate a draft reply based on this ticket&apos;s content. You can
-            edit, copy, or insert it as a reply.
+            Generate a reply draft and triage suggestions (priority &amp;
+            category) based on this ticket. You can edit, copy, insert, or apply.
           </p>
           <button
             type="button"
             onClick={generate}
             className="ticket-card mt-3 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
           >
-            Generate suggested reply
+            Generate AI suggestion
           </button>
         </div>
       ) : null}
@@ -86,14 +116,78 @@ export function AiSuggestedReply({
         </div>
       ) : null}
 
-      {state === "generated" ? (
+      {state === "error" ? (
         <div className="mt-3">
+          <p className="text-sm text-red-600">
+            Couldn&apos;t generate a suggestion. Please try again.
+          </p>
+          <button
+            type="button"
+            onClick={generate}
+            className="mt-3 rounded-xl border border-border bg-surface px-3.5 py-2 text-sm font-medium text-foreground hover:border-ink/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {state === "generated" && suggestion ? (
+        <div className="mt-3">
+          {/* Triage suggestions */}
+          <div className="grid gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 sm:grid-cols-2">
+            <SuggestionRow
+              label="Suggested priority"
+              value={
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className={`h-1.5 w-1.5 rounded-full ${PRIORITY_DOT_CLASS[suggestion.suggestedPriority]}`}
+                  />
+                  {PRIORITY_LABELS[suggestion.suggestedPriority]}
+                </span>
+              }
+              applied={priorityMatches}
+              disabled={priorityMatches || isApplying}
+              onApply={() =>
+                startApply(() =>
+                  applySuggestionAction(ticket.id, {
+                    priority: suggestion.suggestedPriority,
+                  }),
+                )
+              }
+            />
+            <SuggestionRow
+              label="Suggested category"
+              value={CATEGORY_LABELS[suggestion.suggestedCategory]}
+              applied={categoryMatches}
+              disabled={categoryMatches || isApplying}
+              onApply={() =>
+                startApply(() =>
+                  applySuggestionAction(ticket.id, {
+                    category: suggestion.suggestedCategory,
+                  }),
+                )
+              }
+            />
+          </div>
+
+          {suggestion.reasoning ? (
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              <span className="font-medium text-foreground/70">Reasoning:</span>{" "}
+              {suggestion.reasoning}{" "}
+              <span className="text-faint">
+                (confidence: {suggestion.confidence})
+              </span>
+            </p>
+          ) : null}
+
+          {/* Reply draft */}
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             rows={12}
             aria-label="AI suggested reply draft"
-            className="w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            className="mt-3 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-ink/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
@@ -126,5 +220,36 @@ export function AiSuggestedReply({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function SuggestionRow({
+  label,
+  value,
+  applied,
+  disabled,
+  onApply,
+}: {
+  label: string;
+  value: React.ReactNode;
+  applied: boolean;
+  disabled: boolean;
+  onApply: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-xs text-faint">{label}</div>
+        <div className="mt-0.5 text-sm text-foreground">{value}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={disabled}
+        className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground hover:border-ink/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {applied ? "Applied" : "Apply"}
+      </button>
+    </div>
   );
 }

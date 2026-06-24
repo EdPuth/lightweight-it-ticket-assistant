@@ -237,3 +237,54 @@
 - **员工隔离演示**：员工账号从 1 个改为 3 个（tom/jerry/mia）。`scripts/seed-users.ts` 把现有工单
   round-robin 分给三人，并把每条工单的 requester 署名改为对应员工。这样登录 tom 只看到 tom 的工单
   （此前"看到全部"并非权限 bug——过滤逻辑正确，只是种子把所有旧工单都回填给了单一 employee）。
+
+## D15 — 下一阶段改为 AI API v1，随后做 FAQ / Knowledge Base
+- **背景**：RBAC Auth v1 完成后，Owner 想先用自己的 API key 测试真实 AI 能力：生成建议回复、
+  分类建议和优先级建议。AI API 后的下一阶段，希望给 Admin / IT Support 加 FAQ / 常见 ticket
+  问题页面，并保持代码以后容易扩展。
+- **决定**：
+  - 下一阶段命名为 **AI API v1**。
+  - API key 只放 server env（如 `AI_API_KEY` / `AI_API_BASE_URL` / `AI_MODEL`），不进入客户端 bundle。
+  - 新增 provider adapter 层（例如 `src/lib/ai/provider.ts`），业务代码只依赖项目内统一接口，
+    方便 Owner 先用自己的 API 测试，后续替换供应商。
+  - AI 功能只对 `it_support` / `admin` 可用；Employee 仍只查看 ticket 状态和 IT 回复。
+  - AI 返回结构化建议：`replyDraft`、`suggestedCategory`、`suggestedPriority`、`confidence`、`reason`。
+  - `suggestedCategory` / `suggestedPriority` 必须经过现有 enum 校验；AI 输出永远只是 suggestion，
+    v1 不自动修改 ticket。
+  - 保留现有 `reply-templates.ts` 本地模板作为 fallback：API 未配置、失败、超时或返回非法结构时仍可用。
+- **FAQ / Knowledge Base 方向**：
+  - AI API 后再做 Admin / IT Support 可见的 FAQ / 常见 ticket 问题模块。
+  - 优先复用或演进 `solutionTemplates` 的数据形状，不把 FAQ 文案硬编码在组件里。
+  - v1 可先用 TS data module；后续如需要编辑/搜索/权限管理，再迁移到 Supabase 表。
+  - AI prompt 设计要能在未来注入相关 FAQ entry，作为生成回复的上下文。
+- **暂不做**：自动发送邮件、自动应用分类/优先级、面向 Employee 的 FAQ 门户、完整 CMS、向量搜索。
+
+## D15 — AI API v1：真实 LLM 生成回复/优先级/分类建议（Owner 开新 scope）
+- **背景**：Owner 要接入 API,让系统生成推荐回复 + 优先级 + 分类建议。Codex「RBAC review」要求
+  先修详情页 metadata 越权泄露,再做 AI;AI 必须 server-only、单 adapter 可换 provider、staff-only、
+  enum-safe、保留本地模板兜底、返回结构化结果。
+- **先修的安全项(Codex P2)**：`generateMetadata` 之前在 `canViewTicket` 之前就返回真实标题,员工
+  打开他人工单会从浏览器标题泄露。已改为先取 profile + `canViewTicket`,无权时返回通用 "Ticket not
+  found" 标题;并把 `getTicketById` 包 React `cache()`,metadata 与页面 body 共用一次查询。
+- **Owner 拍板**：① 用 **Anthropic Claude**;② 用 **Vercel AI SDK**(`ai` + `@ai-sdk/anthropic`);
+  ③ **生成 + 一键应用**建议的优先级/分类。
+- **实现**:
+  - 依赖:`ai` + `@ai-sdk/anthropic`(第 3/4 个运行时依赖)。env `ANTHROPIC_API_KEY`(server-only,
+    可选;缺失则降级)+ 可选 `AI_MODEL`(默认 `claude-opus-4-8`)。
+  - `src/lib/ai/provider.ts`:adapter——`getAiModel()` / `isAiConfigured()`;换 provider 只改这里。
+  - `src/lib/ai/suggest.ts`:`generateTicketSuggestion(ticket)` 用 `generateObject` + `jsonSchema`
+    (无 zod)产出 `{ replyDraft, suggestedCategory, suggestedPriority, reasoning, confidence, source }`;
+    category/priority 用 schema enum 约束 **且** 服务端用 `isTicketCategory/isTicketPriority` 再校验
+    (Codex 要求);把相关 `solutionTemplates` 作为 KB 上下文喂给模型(知识库保持灵活)。AI 未配置或
+    调用失败 → 回退到本地模板草稿 + 当前 category/priority,`source: "fallback"`。
+  - Server Actions(`actions.ts`):`generateSuggestionAction`(staff-only,只读,不落库)+
+    `applySuggestionAction`(staff-only,enum 校验后改 priority/category + 记 activity)。
+  - `updateTicketFields` 扩展支持 priority/category;`validation.ts` 加 `validatePriority`/`validateCategory`。
+  - UI:`ai-suggested-reply.tsx` 改为调真实 action,展示草稿 + 建议优先级/分类(可一键 Apply)+ 理由 +
+    信心 + 来源徽标(AI / Local template)。客户端不导入 AI SDK(action 返回类型用 `Awaited<ReturnType>`),
+    密钥不进浏览器。
+- **替代方案**:Vercel AI Gateway(一 key 多 provider)——Owner 选了直连 Anthropic;OpenAI——同上;
+  Anthropic 官方 SDK——Owner 选了 AI SDK(结构化输出更省事、换 provider 容易)。
+- **运维待办(需 Owner)**:本地 `.env.local` + Vercel 加 `ANTHROPIC_API_KEY` 才会用真实 AI;不加则
+  自动用本地模板兜底(功能不报错)。
+- **暂不做**:把 AI 建议写进 create 表单、真实 LLM 分流/缓存、知识库文章页、关键词搜索(扩展点已留)。

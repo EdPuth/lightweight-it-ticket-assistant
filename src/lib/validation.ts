@@ -132,6 +132,28 @@ export function validateStatus(value: unknown, field = "Status"): TicketStatus {
   return value;
 }
 
+/** Validate a priority value, throwing if it is not a known priority. */
+export function validatePriority(
+  value: unknown,
+  field = "Priority",
+): TicketPriority {
+  if (!isTicketPriority(value)) {
+    throw new ValidationError(`${field} is not a valid option.`);
+  }
+  return value;
+}
+
+/** Validate a category value, throwing if it is not a known category. */
+export function validateCategory(
+  value: unknown,
+  field = "Category",
+): TicketCategory {
+  if (!isTicketCategory(value)) {
+    throw new ValidationError(`${field} is not a valid option.`);
+  }
+  return value;
+}
+
 /**
  * Validate an assignee. Empty string means "unassigned". Free text is allowed
  * (existing tickets may have assignees outside the TECHNICIANS list), but it is
