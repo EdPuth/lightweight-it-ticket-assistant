@@ -48,9 +48,68 @@ create table activities (
 create index activities_ticket_id_idx on activities (ticket_id);
 create index activities_created_at_idx on activities (created_at);
 
--- Enable Row Level Security with NO public policies. All access in this app
--- goes through the server using the service_role key, which bypasses RLS.
--- The anon/public key therefore cannot read or write anything.
+-- Row Level Security. Reads go through the user-scoped (anon + user JWT) client
+-- and are governed by the policies below; writes go through the service-role key
+-- (which bypasses RLS) plus app-layer role checks. See docs/decisions.md.
 alter table profiles enable row level security;
 alter table tickets enable row level security;
 alter table activities enable row level security;
+
+-- Current user's role, read with definer rights so policies can use it even
+-- though profiles itself has RLS.
+create or replace function public.app_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select role from public.profiles where id = (select auth.uid())
+$$;
+
+create policy profiles_self_select on profiles
+  for select to authenticated
+  using (id = (select auth.uid()));
+create policy profiles_staff_select on profiles
+  for select to authenticated
+  using (public.app_role() in ('it_support', 'admin'));
+
+create policy tickets_select on tickets
+  for select to authenticated
+  using (
+    public.app_role() in ('it_support', 'admin')
+    or requester_user_id = (select auth.uid())
+  );
+create policy tickets_insert on tickets
+  for insert to authenticated
+  with check (requester_user_id = (select auth.uid()));
+create policy tickets_update on tickets
+  for update to authenticated
+  using (public.app_role() in ('it_support', 'admin'))
+  with check (public.app_role() in ('it_support', 'admin'));
+create policy tickets_delete on tickets
+  for delete to authenticated
+  using (public.app_role() = 'admin');
+
+create policy activities_select on activities
+  for select to authenticated
+  using (
+    exists (
+      select 1 from tickets t
+      where t.id = activities.ticket_id
+        and (
+          public.app_role() in ('it_support', 'admin')
+          or t.requester_user_id = (select auth.uid())
+        )
+    )
+  );
+create policy activities_insert on activities
+  for insert to authenticated
+  with check (
+    public.app_role() in ('it_support', 'admin')
+    or exists (
+      select 1 from tickets t
+      where t.id = activities.ticket_id
+        and t.requester_user_id = (select auth.uid())
+    )
+  );

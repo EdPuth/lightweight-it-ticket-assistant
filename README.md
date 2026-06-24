@@ -5,8 +5,8 @@ small company's internal IT support team handles employee requests, and is a pra
 project for frontend pages, data modeling, state management, a mock AI reply, and a
 two-agent development workflow.
 
-> Practice project: Supabase persistence is enabled and the app is gated behind a single
-> shared login, but there is **no per-user auth / RLS** and **no real AI API**. Do not use
+> Practice project: Supabase persistence, RBAC login, and optional Claude-powered AI
+> suggestions are enabled. Database-level RLS is still a planned follow-up, so do not use
 > real employee/customer data in the public demo.
 
 ## Features (implemented)

@@ -8,6 +8,7 @@ import {
   canViewTicket,
   getCurrentUserProfile,
 } from "@/lib/auth";
+import { findRelevantGuidelines } from "@/lib/knowledge-base";
 import { TicketDetail } from "@/components/ticket-detail";
 
 // Next.js 16：App Router 的 params 是 Promise，必须 await。
@@ -48,11 +49,20 @@ export default async function TicketDetailPage({ params }: TicketPageProps) {
     return <TicketNotFound id={id} />;
   }
 
+  const canProcess = canProcessTickets(profile);
+  // Related guidelines are a staff-only hint; never compute/expose for employees.
+  const relatedGuidelines = canProcess
+    ? findRelevantGuidelines(ticket)
+        .slice(0, 2)
+        .map((g) => ({ id: g.id, title: g.title }))
+    : [];
+
   return (
     <TicketDetail
       ticket={ticket}
-      canProcess={canProcessTickets(profile)}
+      canProcess={canProcess}
       canDelete={canDeleteTickets(profile)}
+      relatedGuidelines={relatedGuidelines}
     />
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import type { Ticket } from "@/lib/types";
 import {
   CATEGORY_LABELS,
@@ -33,6 +34,18 @@ export function AiSuggestedReply({
   );
   const [inserted, setInserted] = useState(false);
   const [isApplying, startApply] = useTransition();
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  const apply = (fields: { priority?: string; category?: string }) => {
+    setApplyError(null);
+    startApply(async () => {
+      try {
+        await applySuggestionAction(ticket.id, fields);
+      } catch {
+        setApplyError("Couldn't apply the suggestion. Please try again.");
+      }
+    });
+  };
 
   const generate = async () => {
     setState("loading");
@@ -149,11 +162,7 @@ export function AiSuggestedReply({
               applied={priorityMatches}
               disabled={priorityMatches || isApplying}
               onApply={() =>
-                startApply(() =>
-                  applySuggestionAction(ticket.id, {
-                    priority: suggestion.suggestedPriority,
-                  }),
-                )
+                apply({ priority: suggestion.suggestedPriority })
               }
             />
             <SuggestionRow
@@ -162,14 +171,16 @@ export function AiSuggestedReply({
               applied={categoryMatches}
               disabled={categoryMatches || isApplying}
               onApply={() =>
-                startApply(() =>
-                  applySuggestionAction(ticket.id, {
-                    category: suggestion.suggestedCategory,
-                  }),
-                )
+                apply({ category: suggestion.suggestedCategory })
               }
             />
           </div>
+
+          {applyError ? (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {applyError}
+            </p>
+          ) : null}
 
           {suggestion.reasoning ? (
             <p className="mt-3 text-xs leading-relaxed text-muted">
@@ -179,6 +190,26 @@ export function AiSuggestedReply({
                 (confidence: {suggestion.confidence})
               </span>
             </p>
+          ) : null}
+
+          {suggestion.relatedGuidelines.length > 0 ? (
+            <div className="mt-3">
+              <span className="text-xs font-medium text-foreground/70">
+                Related guidelines
+              </span>
+              <ul className="mt-1 flex flex-col gap-1">
+                {suggestion.relatedGuidelines.map((g) => (
+                  <li key={g.id}>
+                    <Link
+                      href={`/faq/${g.id}?from=/tickets/${ticket.id}`}
+                      className="text-sm font-medium text-blue-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+                    >
+                      {g.title} →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
 
           {/* Reply draft */}

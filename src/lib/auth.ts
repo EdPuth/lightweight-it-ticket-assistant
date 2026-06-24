@@ -1,12 +1,11 @@
 import { cache } from "react";
 import { getSupabaseAuth } from "./supabase/auth-server";
-import { getSupabaseAdmin } from "./supabase/server";
 import type { Profile, UserRole } from "./types";
 
 // RBAC helpers (server-only). Authentication is handled by Supabase Auth via the
 // cookie-aware client; the role/profile lives in the app-owned `profiles` table.
-// Data access uses the service-role key, so EVERY mutating Server Action and
-// data-scoped read must call these checks — never rely on UI hiding alone.
+// Reads go through the user-scoped client (governed by RLS); mutations still use
+// the service-role client + these role checks — never rely on UI hiding alone.
 
 /**
  * The signed-in user's profile (id + role + display fields), or null.
@@ -25,8 +24,8 @@ export const getCurrentUserProfile = cache(
     const userId = data?.claims?.sub;
     if (claimsErr || !userId) return null;
 
-    const sb = getSupabaseAdmin();
-    const { data: row, error } = await sb
+    // Same user-scoped client: profiles RLS allows reading one's own row.
+    const { data: row, error } = await supabase
       .from("profiles")
       .select("id, email, display_name, role")
       .eq("id", userId)

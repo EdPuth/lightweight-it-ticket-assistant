@@ -238,7 +238,7 @@
   round-robin 分给三人，并把每条工单的 requester 署名改为对应员工。这样登录 tom 只看到 tom 的工单
   （此前"看到全部"并非权限 bug——过滤逻辑正确，只是种子把所有旧工单都回填给了单一 employee）。
 
-## D15 — 下一阶段改为 AI API v1，随后做 FAQ / Knowledge Base
+## D15（计划）— 下一阶段改为 AI API v1，随后做 FAQ / Knowledge Base
 - **背景**：RBAC Auth v1 完成后，Owner 想先用自己的 API key 测试真实 AI 能力：生成建议回复、
   分类建议和优先级建议。AI API 后的下一阶段，希望给 Admin / IT Support 加 FAQ / 常见 ticket
   问题页面，并保持代码以后容易扩展。
@@ -288,3 +288,58 @@
 - **运维待办(需 Owner)**:本地 `.env.local` + Vercel 加 `ANTHROPIC_API_KEY` 才会用真实 AI;不加则
   自动用本地模板兜底(功能不报错)。
 - **暂不做**:把 AI 建议写进 create 表单、真实 LLM 分流/缓存、知识库文章页、关键词搜索(扩展点已留)。
+
+## D16 — 下一阶段改为 FAQ / Guideline v1（staff-only 知识库 + ticket 相关提示）
+- **背景**：AI API v1 完成后，Owner 希望给 Admin 和 IT Support 加一个 FAQ/Guideline 页面，用来沉淀
+  常见 ticket 问题的处理方法。同时希望在相关 ticket 详情页给 support/admin 一个小提示，能跳到对应
+  guideline。
+- **决定**：
+  - 下一阶段命名为 **FAQ / Guideline v1**。
+  - 入口和页面仅对 `admin` / `it_support` 可见；Employee 不显示入口，也不能直接访问。
+  - v1 先用 TS data module（如 `src/lib/knowledge-base.ts`），不做数据库表、CMS 或在线编辑。
+  - guideline 数据结构保持可扩展：`id`、`title`、`summary`、`category`、`keywords`、`sections`、
+    `template`。后续可迁移到 Supabase 或作为 AI prompt context。
+  - 初始 guideline 至少包括：
+    1. Outlook 常见邮箱问题和解决方法；
+    2. 设备 MAM 管理中如何分配 App 下载/使用权限；
+    3. 如何帮员工设置 email auto-reply 和 forwarding。
+  - Ticket 详情页做非阻塞相关提示：根据 title/description/category 的关键词匹配 guideline，例如
+    Outlook 相关 ticket 显示 "This looks related to Outlook. View the FAQ guideline?"，点击跳转
+    guideline detail。
+- **暂不做**：完整 CMS、富文本编辑器、数据库编辑权限、向量搜索、复杂推荐算法、Employee FAQ 门户。
+
+## D16 — FAQ / Guideline v1（staff-only 知识库）+ AI review 修补
+- **背景**：Codex「AI review」要求先修两点再做 FAQ；FAQ/Guideline v1 是 Owner 写在 tasks.md 的下一阶段
+  目标（邮箱知识库雏形）。
+- **先修（Codex AI review）**：
+  - [P2] AI `replyDraft` 加 server-side 长度上限：`suggest.ts` 给 schema 加 `maxLength: LIMITS.note`,
+    并在返回前 `clampDraft()` 截断（AI 与 fallback 两路都截），避免生成成功但「Insert as reply」时超过
+    note 限制而失败。顺带给 `generateObject` 加 `maxOutputTokens: 2048` 控制成本。
+  - [P3] Apply 失败可见反馈：`ai-suggested-reply.tsx` 的 apply 包 try/catch + `applyError` 文案。
+  - [P3] 文档：`decisions.md` 第一个 D15 改名「D15（计划）」消除重复标题。
+- **FAQ / Guideline v1（决策本体）**：
+  - 数据驱动、无 DB：`src/lib/knowledge-base.ts`——`Guideline { id, title, summary, category, keywords,
+    sections[] }` + `getGuidelineById` + `findRelevantGuidelines(ticket)`（关键词匹配，复用 matchScore 思路）。
+    v1 含三篇：Outlook 邮箱问题、MAM App 分配、邮箱 auto-reply/forwarding。
+  - 页面：`/faq`（index）+ `/faq/[id]`（detail），**staff-only**（`canProcessTickets`，否则 `notFound()`——
+    employee 直接 404、看不到入口）。Dashboard 顶栏对 staff 显示 Guidelines 链接。
+  - Ticket detail：staff 打开工单时按关键词匹配相关 guideline，显示非阻塞蓝色提示直链到对应 guideline;
+    employee 不计算也不显示（page 只在 `canProcess` 时传 `relatedGuidelines`）。
+  - 数据形状刻意通用,方便以后：① 渲染成更多文章;② 作为 AI prompt context（与 `solutionTemplates` 类似,
+    后续可统一）。
+- **暂不做**：FAQ 在线编辑 / CMS / 数据库表 / 富文本 / 向量搜索;把 guideline 接进 AI prompt（留作 follow-up）。
+
+### D16 补充 — AI 选相关 guideline（方案 B）+ guideline 作 AI 上下文（follow-up #1）
+- **背景**：关键词匹配只认写死的 keyword，遇到同义/改写会漏；Owner 要更智能的关联。
+- **决定（不额外加 API 调用）**：在已有的 AI 建议调用里一并完成：
+  - **follow-up #1（RAG 上下文）**：把全部 `guidelines`（id/title/summary/steps）作为上下文喂进 prompt，
+    让模型用真实 FAQ 步骤写回复。
+  - **方案 B（AI 选关联）**：schema 增加 `relevantGuidelineIds`（enum 限定为现有 guideline id），模型
+    返回它判断相关的 id；服务端 `toRelatedGuidelines()` 校验 id 存在后映射成 `{id,title}`，在 AI 面板
+    展示「Related guidelines」直链。AI 未配置/失败时回退用关键词 `findRelevantGuidelines()`。
+  - 详情页顶部那条**即时关键词提示保留**（免费、加载即有）；AI 面板的关联是**生成后、语义更准**的一版
+    （例如含 "Outlook" 字样但其实是 auto-reply 的工单，关键词会多匹配 Outlook，AI 只挑 auto-reply）。
+- **验证**：真实 AI 下 TKT-1017(MAM)→ AI 选 mam-app-assignment；TKT-1019(auto-reply)→ 只选
+  email-auto-reply-forwarding（忽略了关键词会误中的 outlook）。reasoning 为模型生成、非 fallback 文案。
+- **影响 / 扩展**：guideline 目前全量入 prompt（仅 3 篇，体量小）；KB 变大后改为先用关键词/embedding 预筛
+  再喂，避免 prompt 过长。

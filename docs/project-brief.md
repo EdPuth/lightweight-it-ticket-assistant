@@ -34,11 +34,12 @@ AI suggested reply 的草稿（mock）。
 - IT Support 可以查看和处理全部 ticket，但不能删除。
 - Admin 拥有全部权限，包括删除。
 
-下一阶段目标是 **AI API v1**：用 server-only API key 生成建议回复、分类建议和优先级建议。
-AI 建议只给 IT Support / Admin 使用，并且只作为 suggestion，不自动修改 ticket。
+已完成 **AI API v1**：用 server-only API key 生成建议回复、分类建议和优先级建议。
+AI 建议只给 IT Support / Admin 使用，并且只作为 suggestion，由 staff 手动确认应用。
 
-AI API 后的目标是 Admin / IT Support 可见的 FAQ / Knowledge Base，用于沉淀常见 ticket 问题和
-解决步骤，并保持数据结构灵活，方便未来被搜索或作为 AI 上下文。
+下一阶段目标是 Admin / IT Support 可见的 **FAQ / Guideline**，用于沉淀常见 ticket 问题和解决步骤。
+Ticket 详情页应能根据关键词显示相关 guideline 提示，例如 Outlook ticket 可跳到 Outlook FAQ。
+FAQ 数据结构要保持灵活，方便未来被搜索或作为 AI 上下文。
 
 ## 数据模型（来自文档 §5）
 

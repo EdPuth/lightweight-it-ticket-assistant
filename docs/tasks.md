@@ -18,7 +18,9 @@
 | DB Ext 3 | 写迁移：Server Actions 落库 | 创建/改状态/备注/指派/插入回复持久化 | ✅ 完成 |
 | DB Ext 4 | Vercel 部署 + 文档收尾 | 线上可读写；README/docs 更新 | ✅ 完成 |
 | RBAC Auth v1 | 多账号登录 + Employee / IT Support / Admin 权限 | 不同角色看到/能做的操作符合权限矩阵；服务端校验不只靠 UI 隐藏 | ✅ 完成 |
-| AI API v1 | 接入真实 API 生成回复、分类、优先级建议 | server-only API key；结构化输出；失败时可回退本地模板 | ⏭️ 下一步 |
+| AI API v1 | 接入真实 API 生成回复、分类、优先级建议 | server-only API key；结构化输出；失败时可回退本地模板 | ✅ 完成 |
+| FAQ / Guideline v1 | staff-only 知识库（index + detail）+ ticket 相关提示 | 仅 admin/it_support 可访问；employee 不可见；数据驱动 | ✅ 完成 |
+| FAQ / Guideline v1 | Admin/Support 常见问题 guideline + ticket 相关提示 | staff-only FAQ 页面；详情页相关提示可跳转 guideline；数据结构可扩展 | ⏭️ 下一步 |
 
 ---
 
@@ -157,21 +159,38 @@
   - `node --env-file=.env.local scripts/seed-users.ts` 建账号 + 回填旧工单。
   - 确认 Supabase 启用 Email 登录（默认开）。
 - **Codex RBAC review 待修**：
-  - 先修 `src/app/tickets/[id]/page.tsx` 的 metadata 权限泄露：`generateMetadata()` 不能在未做
-    `canViewTicket()` 前返回隐藏 ticket 的真实 title。
-- **下一阶段：AI API v1（Owner 用自己的 API key 测试）**
-  - API key 只放 server env，例如 `AI_API_KEY` / `AI_API_BASE_URL` / `AI_MODEL`，不要暴露到 client。
-  - 加一层 provider adapter（例如 `src/lib/ai/provider.ts`），UI/业务代码不要直接依赖某个供应商 SDK。
-  - 只允许 `it_support` / `admin` 调用 AI 生成；Employee 只查看 IT 回复，不看到生成控件。
-  - 保留当前 `reply-templates.ts` 本地模板作为 fallback：API 未配置、失败、超时、返回无效结构时仍能生成 mock draft。
-  - 返回结构化结果：`replyDraft`、`suggestedCategory`、`suggestedPriority`、`confidence`、`reason`。
-  - `suggestedCategory` / `suggestedPriority` 必须做 enum 校验，不能直接信模型输出。
-  - v1 只做“建议”，不要自动改 ticket 分类/优先级；让 support/admin 手动确认应用。
-- **AI API 后的下一阶段：FAQ / Knowledge Base（Admin + IT Support）**
-  - 为常见 ticket 问题做可扩展 FAQ/解决方案模块，优先复用或演进 `solutionTemplates` 的数据形状。
-  - 页面只给 `admin` / `it_support` 看；Employee 暂不需要 FAQ 管理入口。
-  - 保持数据驱动，方便之后新增 FAQ、搜索、把 FAQ 作为 AI prompt context。
-  - 不要把 FAQ 文案硬编码在组件里；先用 TS data module，后续可迁移到 Supabase 表。
+  - ~~metadata 权限泄露~~：已在 AI API v1 先修，`generateMetadata()` 现在先 `canViewTicket()`。
+- ~~**Codex AI review 待修**~~ 已修（决策 D16）：
+  - ~~AI `replyDraft` 加 server-side 长度上限~~：`suggest.ts` schema `maxLength` + `clampDraft()`（两路都截）；
+    顺带 `maxOutputTokens: 2048`。
+  - ~~Apply 无失败反馈~~：`ai-suggested-reply.tsx` 加 `applyError`。
+  - ~~重复 D15 heading~~：第一个改名「D15（计划）」。
+- ~~**下一阶段：FAQ / Guideline v1（Admin + IT Support）**~~ **已完成（决策 D16）**：
+  `src/lib/knowledge-base.ts`（3 篇 guideline + `findRelevantGuidelines`）；`/faq` index + `/faq/[id]`
+  detail（staff-only，employee `notFound`）；Dashboard staff 显示 Guidelines 链接；ticket detail 对 staff
+  显示相关 guideline 提示（employee 不显示）。浏览器验证全过、无 console 报错；lint/build 通过。
+  原始需求清单见下（保留作参考）：
+- **（已完成）FAQ / Guideline v1 需求清单（Admin + IT Support）**
+  - staff-only 页面：`admin` / `it_support` 可进入 FAQ/Guideline；Employee 不显示入口且不能访问。
+  - 做一个 FAQ index 页面，展示几篇 guideline 卡片，可按 category/keywords 简单筛选或搜索（轻量即可）。
+  - 做 guideline detail 页面，每篇像简单指导博客，内容可先是简短文字 + template。
+  - v1 至少包含：
+    - Outlook 常见邮箱问题和解决方法；
+    - 设备 MAM 管理中如何分配 App 下载/使用权限；
+    - 如何帮员工设置 email auto-reply 和 forwarding。
+  - 数据保持灵活：优先新增 `src/lib/knowledge-base.ts` 或演进 `solutionTemplates`，字段建议：
+    `id`、`title`、`summary`、`category`、`keywords`、`sections`、`template`。
+  - Ticket detail 相关提示：
+    - support/admin 打开相关 ticket 时，根据 title/description/category 关键词匹配 guideline；
+    - 例如 Outlook ticket 显示小提示："This looks related to Outlook. View the FAQ guideline?";
+    - 点击提示跳到对应 guideline detail；
+    - Employee 不显示这个提示。
+  - 暂不做完整 CMS、FAQ 在线编辑、数据库表、富文本编辑器或向量搜索。
+- ~~让 AI API 把相关 FAQ guideline 作为 prompt context~~ **已完成（D16 补充）**：guideline 全量入 prompt
+  作上下文（follow-up #1），且 AI 在同一次调用里返回相关 guideline id（方案 B，语义匹配，比关键词更准）；
+  另加脚本 `scripts/seed-demo-tickets.ts` 建了 MAM / auto-reply / forwarding 的 demo 工单。
+- **剩余 follow-up**：Supabase RLS policies（数据库层权限兜底，放真实/私有数据前必须做）；
+  KB 变大后把 guideline 入 prompt 改为关键词/embedding 预筛。
 - **安全 follow-up 仍保留**：Supabase RLS policies（employee 只能 select/insert 自己的、support/admin 全部、
   仅 admin delete、activity 可见性跟随 ticket），在放真实/私有数据前必须做。
 
@@ -187,6 +206,7 @@
   否则 Employee 可能在 browser title/head 中看到别人的 ticket 标题。
 - AI API 风险：API key 绝不能放进 client bundle；所有 AI 调用必须走 Server Action / Route Handler。
 - AI 输出风险：模型建议的 category/priority 只能作为 suggestion，必须经过 enum 校验并由 support/admin 确认。
+- AI draft 长度风险：模型输出必须受 server-side 长度限制，否则可能生成成功但插入 reply 失败。
 - FAQ/Knowledge Base 范围风险：先做轻量、数据驱动的常见问题模块，不要扩成完整 CMS 或文档平台。
 - `@supabase/ssr` 是第二个运行时依赖（D14）：升级 Supabase 时需一并验证 SSR cookie 行为。
 - ~~默认 session token 可伪造~~：已修（D13）——生产强制 `AUTH_SESSION_TOKEN`，缺失即抛错；
@@ -221,7 +241,7 @@
 - ~~登录与角色权限：employee / IT support / admin（建议作为下一个生产化 scope）~~：已升级为下一阶段 RBAC Auth v1。
 - 邮件入站生成 ticket：暂缓，等 RBAC/Auth 稳定后再做。
 - ~~接入真实 AI API 生成回复、分类和优先级建议~~：已升级为下一阶段 AI API v1。
-- Admin / IT Support FAQ（常见 ticket 问题 / 知识库）：AI API v1 后做，保持 `solutionTemplates` 可演进。
+- Admin / IT Support FAQ（常见 ticket 问题 / 知识库）：下一阶段做，保持 guideline 数据可被详情页提示和 AI prompt 复用。
 - ~~部署到 Vercel~~：DB Ext Step 4 已完成。
 - **（Owner 提出）关键词搜索以往 ticket**：technician 用 Outlook / email 等关键词找到历史相关工单。
   扩展点已就绪：复用 `reply-templates.ts` 的 `matchScore`，并让 `searchTickets` 也匹配 `description`。

@@ -80,7 +80,17 @@ export function DashboardClient({
             {ROLE_LABELS[profile.role]}
           </span>
         </span>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          {profile.role !== "employee" ? (
+            <Link
+              href="/faq"
+              className="rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            >
+              Guidelines
+            </Link>
+          ) : null}
+          <LogoutButton />
+        </div>
       </div>
 
       <header className="flex items-end justify-between gap-4">

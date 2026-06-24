@@ -29,10 +29,12 @@ export function TicketDetail({
   ticket,
   canProcess,
   canDelete,
+  relatedGuidelines = [],
 }: {
   ticket: Ticket;
   canProcess: boolean;
   canDelete: boolean;
+  relatedGuidelines?: { id: string; title: string }[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [noteDraft, setNoteDraft] = useState("");
@@ -125,6 +127,27 @@ export function TicketDetail({
           {ticket.description}
         </div>
       </section>
+
+      {canProcess && relatedGuidelines.length > 0 ? (
+        <aside className="mt-6 rounded-xl border border-blue-200 bg-blue-50/40 px-5 py-3">
+          <p className="text-xs text-muted">
+            Related guideline{relatedGuidelines.length > 1 ? "s" : ""} — this
+            ticket looks related to:
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {relatedGuidelines.map((g) => (
+              <li key={g.id}>
+                <Link
+                  href={`/faq/${g.id}?from=/tickets/${ticket.id}`}
+                  className="text-sm font-medium text-blue-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+                >
+                  {g.title} →
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      ) : null}
 
       {canProcess ? (
       <section className="mt-6 grid gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:grid-cols-2">

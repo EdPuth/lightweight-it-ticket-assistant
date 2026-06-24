@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase/server";
+import { getSupabaseAuth } from "./supabase/auth-server";
 import type {
   Ticket,
   TicketActivity,
@@ -72,7 +73,8 @@ function mapTicket(row: TicketRow, activities: ActivityRow[]): Ticket {
 export async function listTickets(
   opts: { ownerUserId?: string } = {},
 ): Promise<Ticket[]> {
-  const sb = getSupabaseAdmin();
+  // Read via the user-scoped client so RLS enforces visibility at the DB layer.
+  const sb = await getSupabaseAuth();
 
   const ticketsQuery = sb.from("tickets").select("*");
   if (opts.ownerUserId) {
@@ -93,7 +95,8 @@ export const getTicketById = cache(_getTicketById);
 // Deduped per request via cache() above (the detail page reads it in both
 // generateMetadata and the page body).
 async function _getTicketById(id: string): Promise<Ticket | null> {
-  const sb = getSupabaseAdmin();
+  // User-scoped client: RLS returns nothing for tickets the user can't see.
+  const sb = await getSupabaseAuth();
 
   // Fetch the ticket and its activities in parallel (one round-trip instead of
   // two sequential ones). If the ticket is missing, the activities are ignored.
@@ -122,7 +125,7 @@ async function _getTicketById(id: string): Promise<Ticket | null> {
 export async function getTicketFields(
   id: string,
 ): Promise<{ status: TicketStatus; assignedTo: string } | null> {
-  const sb = getSupabaseAdmin();
+  const sb = await getSupabaseAuth();
   const { data, error } = await sb
     .from("tickets")
     .select("status, assigned_to")

@@ -306,3 +306,57 @@
 #### AI API References
 - OpenAI text generation docs: https://developers.openai.com/api/docs/guides/text
 - OpenAI structured outputs docs: https://developers.openai.com/api/docs/guides/structured-outputs
+
+### AI API v1 — Claude Suggestions Review
+- 状态：✅ Reviewed by Codex on 2026-06-24
+
+#### Summary
+- The previous RBAC metadata leak is fixed: `generateMetadata()` now loads the profile and applies `canViewTicket()` before returning a real ticket title.
+- The AI integration is correctly server-side: `@ai-sdk/anthropic` and `ai` are only imported from `src/lib/ai/*`, and the client component calls Server Actions instead of touching the provider or API key directly.
+- The provider adapter is a good seam for this practice project. It is Anthropic-specific today, but the rest of the app depends on `generateTicketSuggestion()` rather than provider details.
+- Structured output is a good choice: category/priority are constrained by schema and rechecked with existing enum guards before reaching the UI.
+- Staff-only access is enforced server-side by `requireRole("it_support", "admin")` in both AI Server Actions.
+
+#### Verification
+- `npm run lint` ✅
+- `npm run build` ✅
+- Source review ✅
+  - `src/lib/ai/provider.ts`
+  - `src/lib/ai/suggest.ts`
+  - `src/app/actions.ts`
+  - `src/components/ai-suggested-reply.tsx`
+  - `src/app/tickets/[id]/page.tsx`
+  - `src/lib/tickets-repo.ts`
+  - `src/lib/validation.ts`
+  - `.env.example`
+  - `README.md`
+
+#### Findings
+- **P2 — AI reply draft needs a server-side length cap before it reaches the UI.** `src/lib/ai/suggest.ts:45-49` describes `replyDraft` but does not set a max length, and `src/lib/ai/suggest.ts:125-126` returns the model draft directly. `insertReplyAction()` later validates replies with the existing 5000-character note limit, so an overlong model output can look generated successfully but fail when staff clicks "Insert as reply." Add `maxLength` to the JSON schema and/or clamp `replyDraft` to `LIMITS.note` before returning.
+- **P3 — AI calls have no explicit response budget.** The default model is currently `claude-opus-4-8`, which is valid but premium. For a practice app, set a bounded output budget and document `AI_MODEL` examples such as a cheaper Sonnet/Haiku option. This keeps accidental testing costs predictable.
+- **P3 — Apply suggestion has no visible failure state.** `src/components/ai-suggested-reply.tsx:151-170` starts the `applySuggestionAction()` transition but does not catch/report errors. If the update fails, the button simply becomes usable again with no explanation. A small `applyError` message would match the rest of the app's friendly error states.
+- **P3 — README top summary was stale.** `README.md:8-10` still said the app used a single shared login and had no real AI API, while the implemented feature list correctly said RBAC + Claude API. I fixed the top note during this review so the first impression is accurate.
+- **P3 — Decision log has duplicate D15 headings.** `docs/decisions.md` contains both the planning D15 and the implementation D15. Not a runtime issue, but it makes the handoff harder to scan. Rename the first to "D15 plan" or merge them during the next docs cleanup.
+
+#### Next Actions For Claude Code
+1. Fix the P2 AI draft length cap before starting FAQ work.
+2. Do a tiny docs cleanup:
+   - duplicate D15 headings;
+   - remove stale "AI API next" text from `docs/tasks.md`.
+3. Start **FAQ / Guideline v1** for `admin` and `it_support` only:
+   - add a staff-only FAQ index page;
+   - add individual guideline pages;
+   - start with TS data, not a database table, unless Owner asks for editing UI;
+   - include at least Outlook email issues, MAM app assignment, and email auto-reply/forwarding setup.
+4. Add related FAQ hints on ticket detail:
+   - if a ticket matches Outlook/email keywords, show a small non-blocking hint;
+   - link directly to the relevant guideline;
+   - hide the hint from Employee.
+5. Keep it flexible for future AI context:
+   - do not hard-code FAQ body text inside components;
+   - use reusable fields like `id`, `title`, `summary`, `category`, `keywords`, `body/sections`, `template`;
+   - make AI prompt context later read from the same data source.
+
+#### References
+- Anthropic model IDs and current Claude API models: https://platform.claude.com/docs/en/about-claude/models/overview
+- Vercel AI SDK Anthropic provider docs: https://ai-sdk.dev/providers/ai-sdk-providers/anthropic
